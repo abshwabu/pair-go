@@ -1,12 +1,14 @@
 package checkins
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -14,10 +16,18 @@ import (
 	"github.com/abshwabu/pair/backend/internal/auth"
 )
 
+// Notifier defines the interface for emitting notifications.
+type Notifier interface {
+	Send(ctx context.Context, userID, notificationType string, payload map[string]any) error
+}
+
 // Handler provides HTTP endpoints for check-ins and streaks.
 type Handler struct {
 	repo          *Repository
 	streakService *StreakService
+	notifier      Notifier
+	nudgeMu       sync.Mutex
+	lastNudges    map[string]time.Time
 }
 
 // NewHandler creates a new checkins Handler.
@@ -25,7 +35,13 @@ func NewHandler(repo *Repository, streakService *StreakService) *Handler {
 	return &Handler{
 		repo:          repo,
 		streakService: streakService,
+		lastNudges:    make(map[string]time.Time),
 	}
+}
+
+// SetNotifier sets the notification service on the Handler.
+func (h *Handler) SetNotifier(n Notifier) {
+	h.notifier = n
 }
 
 type response struct {
@@ -168,6 +184,20 @@ func (h *Handler) CheckIn(w http.ResponseWriter, r *http.Request) {
 		Streak:               streakStatus,
 	}
 
+	// Trigger checkin_nudge to partner if partner has not yet checked in today
+	if !bothCheckedIn && h.notifier != nil {
+		partnerID, err := h.repo.GetPartnerID(r.Context(), podID, user.ID)
+		if err == nil && partnerID != "" {
+			payload := map[string]any{
+				"type":   "checkin_nudge",
+				"pod_id": podID,
+				"title":  "Check-in Reminder",
+				"body":   user.Name + " checked in! Don't forget your daily check-in.",
+			}
+			_ = h.notifier.Send(r.Context(), partnerID, "checkin_nudge", payload)
+		}
+	}
+
 	respondJSON(w, http.StatusCreated, result)
 }
 
@@ -223,3 +253,59 @@ func (h *Handler) GetStreak(w http.ResponseWriter, r *http.Request) {
 
 	respondJSON(w, http.StatusOK, details)
 }
+
+// Nudge handles POST /api/v1/pods/{pod}/nudge.
+// Member-only, rate limited to 1 per 6 hours per pod per sender. Returns 429 otherwise.
+func (h *Handler) Nudge(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.UserFromContext(r.Context())
+	if !ok || user == nil {
+		respondError(w, http.StatusUnauthorized, "UNAUTHORIZED", "authentication required")
+		return
+	}
+
+	podID := chi.URLParam(r, "pod")
+	if podID == "" {
+		podID = chi.URLParam(r, "id")
+	}
+	if podID == "" {
+		respondError(w, http.StatusBadRequest, "VALIDATION_ERROR", "missing pod id")
+		return
+	}
+
+	now := time.Now().UTC()
+	key := podID + ":" + user.ID
+
+	h.nudgeMu.Lock()
+	if h.lastNudges == nil {
+		h.lastNudges = make(map[string]time.Time)
+	}
+	lastTime, exists := h.lastNudges[key]
+	if exists && now.Sub(lastTime) < 6*time.Hour {
+		h.nudgeMu.Unlock()
+		respondError(w, http.StatusTooManyRequests, "RATE_LIMITED", "you can only nudge your partner once every 6 hours")
+		return
+	}
+	h.lastNudges[key] = now
+	h.nudgeMu.Unlock()
+
+	partnerID, err := h.repo.GetPartnerID(r.Context(), podID, user.ID)
+	if err != nil || partnerID == "" {
+		respondError(w, http.StatusNotFound, "NOT_FOUND", "partner not found in pod")
+		return
+	}
+
+	if h.notifier != nil {
+		payload := map[string]any{
+			"type":   "checkin_nudge",
+			"pod_id": podID,
+			"title":  "Check-in Reminder",
+			"body":   user.Name + " nudged you to complete your daily check-in!",
+		}
+		_ = h.notifier.Send(r.Context(), partnerID, "checkin_nudge", payload)
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{
+		"message": "nudge sent successfully",
+	})
+}
+

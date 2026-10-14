@@ -15,6 +15,7 @@ import (
 	"github.com/abshwabu/pair/backend/internal/db"
 	"github.com/abshwabu/pair/backend/internal/goals"
 	"github.com/abshwabu/pair/backend/internal/matching"
+	"github.com/abshwabu/pair/backend/internal/notifications"
 	"github.com/abshwabu/pair/backend/internal/pods"
 	"github.com/abshwabu/pair/backend/internal/safety"
 	"github.com/abshwabu/pair/backend/internal/storage"
@@ -96,6 +97,16 @@ func NewRouterWithWorker(cfg *config.Config, database *db.DB, storageService sto
 	safetyRepo := safety.NewRepository(database.Write, database.Read)
 	safetyHandler := safety.NewHandler(safetyRepo, podsRepo, chatHub)
 
+	notificationsRepo := notifications.NewRepository(database.Write, database.Read)
+	notificationsService := notifications.NewService(notificationsRepo, database.Read)
+	notificationsHandler := notifications.NewHandler(notificationsRepo)
+
+	if worker != nil {
+		worker.SetNotifier(notificationsService)
+	}
+	chatHandler.SetNotifier(notificationsService, podsRepo)
+	checkinsHandler.SetNotifier(notificationsService)
+
 	// /healthz endpoint - responds with HTTP 200 and standard envelope
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		dbStatus := "ok"
@@ -136,6 +147,7 @@ func NewRouterWithWorker(cfg *config.Config, database *db.DB, storageService sto
 			r.Use(authMW)
 			r.Get("/", profileHandler.GetProfile)
 			r.Patch("/", profileHandler.UpdateProfile)
+			r.Patch("/fcm-token", profileHandler.UpdateFCMToken)
 			r.Post("/avatar", profileHandler.UploadAvatar)
 		})
 
@@ -182,6 +194,7 @@ func NewRouterWithWorker(cfg *config.Config, database *db.DB, storageService sto
 				r.Post("/check-ins", checkinsHandler.CheckIn)
 				r.Get("/check-ins", checkinsHandler.ListCheckIns)
 				r.Get("/streak", checkinsHandler.GetStreak)
+				r.Post("/nudge", checkinsHandler.Nudge)
 			})
 		})
 
@@ -205,7 +218,11 @@ func NewRouterWithWorker(cfg *config.Config, database *db.DB, storageService sto
 			r.Get("/", safetyHandler.ListBlocks)
 			r.Delete("/{id}", safetyHandler.DeleteBlock)
 		})
+
+		// Notifications routes
+		notificationsHandler.RegisterRoutes(r, authMW)
 	})
+
 
 	return r
 }

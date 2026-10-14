@@ -18,6 +18,7 @@ import (
 	"github.com/abshwabu/pair/backend/internal/httpapi"
 	"github.com/abshwabu/pair/backend/internal/jobs"
 	"github.com/abshwabu/pair/backend/internal/matching"
+	"github.com/abshwabu/pair/backend/internal/notifications"
 	"github.com/abshwabu/pair/backend/internal/storage"
 	"github.com/abshwabu/pair/backend/internal/users"
 )
@@ -53,9 +54,11 @@ func main() {
 		}
 	}()
 
+	// Initialize users repository
+	usersRepo := users.NewRepository(database.Write, database.Read)
+
 	// Handle CLI helper: promote user to administrator
 	if *makeAdminEmail != "" {
-		usersRepo := users.NewRepository(database.Write, database.Read)
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
@@ -81,18 +84,37 @@ func main() {
 	defer workerCancel()
 	go matchingWorker.Start(workerCtx)
 
-	// 5. Initialize in-memory WebSocket chat hub
+	// 5. Initialize notifications service and FCM client
+	notificationsRepo := notifications.NewRepository(database.Write, database.Read)
+	notifService := notifications.NewService(notificationsRepo, database.Read)
+
+	var fcmClient notifications.FCMClient
+	if cfg.FCMCredentialsJSON != "" && cfg.FCMProjectID != "" {
+		client, err := notifications.NewGoogleFCMClient(context.Background(), cfg.FCMProjectID, cfg.FCMCredentialsJSON)
+		if err != nil {
+			slog.Warn("Failed to initialize Google FCM client, push notifications disabled", "error", err)
+			fcmClient = notifications.NewNoopFCMClient()
+		} else {
+			fcmClient = client
+		}
+	} else {
+		fcmClient = notifications.NewNoopFCMClient()
+	}
+
+	notificationsWorker := notifications.NewWorker(notificationsRepo, usersRepo, fcmClient, notifService.NotifyChan())
+	go notificationsWorker.Start(workerCtx)
+
+	// 6. Initialize in-memory WebSocket chat hub
 	chatHub := chat.NewHub()
 
-	// 6. Initialize scheduled jobs (daily streak resets at 00:05 UTC)
+	// 7. Initialize scheduled jobs (daily streak resets at 00:05 UTC)
 	jobScheduler := jobs.NewScheduler()
-	notifier := jobs.NewStubNotificationService()
-	if _, err := jobScheduler.RegisterDailyStreakReset(database.Write, database.Read, notifier); err != nil {
+	if _, err := jobScheduler.RegisterDailyStreakReset(database.Write, database.Read, notifService); err != nil {
 		slog.Error("Failed to register daily streak reset cron job", "error", err)
 	}
 	jobScheduler.Start()
 
-	// 7. Initialize HTTP router
+	// 8. Initialize HTTP router
 	router := httpapi.NewRouterWithWorker(cfg, database, storageService, matchingWorker, chatHub)
 
 	// 7. Configure HTTP server

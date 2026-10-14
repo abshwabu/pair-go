@@ -293,6 +293,50 @@ func (r *Repository) RequireMember(ctx context.Context, podID, userID string) (*
 	return r.GetActiveMember(ctx, podID, userID)
 }
 
+// GetPartner retrieves the active partner member in the pod (i.e. Member with user_id != userID).
+func (r *Repository) GetPartner(ctx context.Context, podID, userID string) (*PodMember, error) {
+	query := `
+		SELECT id, pod_id, user_id, goal_id, joined_at, left_at
+		FROM pod_members
+		WHERE pod_id = ? AND user_id != ? AND (left_at IS NULL OR left_at = '')
+		LIMIT 1;
+	`
+	var m PodMember
+	var joinedAtStr string
+	var leftAtStr *string
+
+	err := r.readDB.QueryRowContext(ctx, query, podID, userID).Scan(
+		&m.ID, &m.PodID, &m.UserID, &m.GoalID, &joinedAtStr, &leftAtStr,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotMember
+		}
+		return nil, fmt.Errorf("failed to get active partner: %w", err)
+	}
+
+	if parsed, err := time.Parse(time.RFC3339, joinedAtStr); err == nil {
+		m.JoinedAt = parsed
+	}
+	if leftAtStr != nil {
+		if parsed, err := time.Parse(time.RFC3339, *leftAtStr); err == nil {
+			m.LeftAt = &parsed
+		}
+	}
+
+	return &m, nil
+}
+
+// GetPartnerID returns the partner's user ID in the pod.
+func (r *Repository) GetPartnerID(ctx context.Context, podID, userID string) (string, error) {
+	m, err := r.GetPartner(ctx, podID, userID)
+	if err != nil {
+		return "", err
+	}
+	return m.UserID, nil
+}
+
+
 // GetPodDetail retrieves a pod detail including both members (profile + goal) and streak summary.
 func (r *Repository) GetPodDetail(ctx context.Context, id string) (*PodDetail, error) {
 	pod, err := r.GetByID(ctx, id)

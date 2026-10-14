@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,10 +19,22 @@ import (
 	"github.com/abshwabu/pair/backend/internal/pods"
 )
 
+// Notifier defines the interface for emitting notifications.
+type Notifier interface {
+	Send(ctx context.Context, userID, notificationType string, payload map[string]any) error
+}
+
+// PartnerResolver resolves the partner member ID for a user in a pod.
+type PartnerResolver interface {
+	GetPartnerID(ctx context.Context, podID, userID string) (string, error)
+}
+
 // Handler provides HTTP and WebSocket endpoints for chat.
 type Handler struct {
-	repo *Repository
-	hub  *Hub
+	repo            *Repository
+	hub             *Hub
+	notifier        Notifier
+	partnerResolver PartnerResolver
 }
 
 // NewHandler creates a new chat Handler.
@@ -30,6 +43,12 @@ func NewHandler(repo *Repository, hub *Hub) *Handler {
 		repo: repo,
 		hub:  hub,
 	}
+}
+
+// SetNotifier sets the notification service and partner resolver on the Handler.
+func (h *Handler) SetNotifier(n Notifier, pr PartnerResolver) {
+	h.notifier = n
+	h.partnerResolver = pr
 }
 
 // RegisterRoutes registers chat endpoints on a Chi router under /pods/{pod}.
@@ -272,8 +291,30 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		Data: msg,
 	})
 
+	// Notify the partner only if hub.IsViewing(podID, partnerID) is false
+	if h.notifier != nil && h.partnerResolver != nil {
+		partnerID, err := h.partnerResolver.GetPartnerID(r.Context(), podID, user.ID)
+		if err == nil && partnerID != "" {
+			if !h.hub.IsViewing(podID, partnerID) {
+				bodyText := "Sent an attachment"
+				if msg.Body != nil && *msg.Body != "" {
+					bodyText = *msg.Body
+				}
+				title := "New message from " + user.Name
+				payload := map[string]any{
+					"type":   "new_message",
+					"pod_id": podID,
+					"title":  title,
+					"body":   bodyText,
+				}
+				_ = h.notifier.Send(r.Context(), partnerID, "new_message", payload)
+			}
+		}
+	}
+
 	respondJSON(w, http.StatusCreated, msg, nil)
 }
+
 
 // SendTyping handles POST /api/v1/pods/{pod}/typing.
 // Broadcasts a typing event to the pod excluding the sender without persisting to SQLite.

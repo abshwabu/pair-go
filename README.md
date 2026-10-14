@@ -299,6 +299,37 @@ curl -X POST http://localhost:8080/api/v1/profile/avatar \
   },
   "meta": null,
   "error": null
+```
+
+### 4. Update Device Push Token (`PATCH /api/v1/profile/fcm-token`)
+
+Updates the authenticated user's Firebase Cloud Messaging (FCM) device push token. Called by the mobile app upon authentication and application launch.
+
+```bash
+curl -X PATCH http://localhost:8080/api/v1/profile/fcm-token \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fcm_token": "fcm-device-registration-token"
+  }'
+```
+
+**Response (`200 OK`):**
+```json
+{
+  "data": {
+    "id": "278c2e90-4b4f-47a7-9477-037dd2e91e18",
+    "name": "David Developer",
+    "email": "dave@example.com",
+    "fcm_token": "fcm-device-registration-token",
+    "timezone": "America/New_York",
+    "language": "en",
+    "is_admin": false,
+    "created_at": "2026-10-14T10:44:04Z",
+    "updated_at": "2026-10-14T11:10:00Z"
+  },
+  "meta": null,
+  "error": null
 }
 ```
 
@@ -1216,7 +1247,31 @@ curl -X GET "http://localhost:8080/api/v1/pods/346ed098-efc0-4ec1-96a0-6dfd4da3a
 
 ---
 
-### 4. Scheduled Jobs (Daily Stale Streak Reset)
+### 4. Nudge Partner (`POST /api/v1/pods/{pod}/nudge`)
+
+Sends a daily check-in nudge notification to the partner in the pod.
+- **Access**: Active pod members only (`RequireMember`).
+- **Rate Limit**: Strictly limited to 1 nudge per 6 hours per pod per sender. Exceeding this window returns `429 Too Many Requests` (`RATE_LIMITED`).
+
+```bash
+curl -X POST http://localhost:8080/api/v1/pods/346ed098-efc0-4ec1-96a0-6dfd4da3ae39/nudge \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response (`200 OK`):**
+```json
+{
+  "data": {
+    "message": "nudge sent successfully"
+  },
+  "meta": null,
+  "error": null
+}
+```
+
+---
+
+### 5. Scheduled Jobs (Daily Stale Streak Reset)
 
 The backend runs a daily background cron job (`robfig/cron`) at **00:05 UTC**:
 - Queries active pods (`pods.status = 'active'`) with an active streak (`current_streak > 0`) whose `last_check_in_date` is older than yesterday.
@@ -1411,6 +1466,100 @@ curl -X DELETE http://localhost:8080/api/v1/blocks/8f395719-74d1-4b11-a8ce-16478
 {
   "data": {
     "message": "unblocked successfully"
+  },
+  "meta": null,
+  "error": null
+}
+```
+
+---
+
+## Notifications & Outbox Worker API
+
+Pair uses a transactional notifications outbox table in SQLite drained by an in-process background worker. Notifications deliver in-app items and push notifications to devices using the **Firebase Cloud Messaging (FCM) HTTP v1 API**.
+
+### Outbox Architecture & Push Delivery
+- **Outbox Table**: Notifications are inserted with `sent_at = NULL`. A signal is dispatched to the background worker without blocking request handlers.
+- **Worker Execution**: The worker drains unsent rows upon receiving an event signal and periodically every 30 seconds.
+- **FCM HTTP v1**: Connects using Google OAuth2 service-account credentials specified by `FCM_PROJECT_ID` and `FCM_CREDENTIALS_JSON`.
+- **Automatic Retry with Exponential Backoff**: Transient FCM delivery failures are retried with exponential backoff up to 5 attempts before marking as abandoned.
+- **Unregistered Token Pruning**: If FCM returns `UNREGISTERED` or `NOT_FOUND` (e.g. app uninstalled or token expired), the worker clears `users.fcm_token` to prevent future wasted requests.
+- **Payload Shape**: All push payloads include `{ "type": ..., "pod_id": ..., "title": ..., "body": ... }` to allow mobile app client-side routing on tap.
+
+### Notification Triggers
+1. **`new_message`**: Emitted when a chat message is sent. The partner is notified only if `hub.IsViewing(podID, partnerID)` is false (suppressed if the partner is actively viewing the live chat).
+2. **`checkin_nudge`**: Emitted when one member checks in and their partner has not yet checked in today, or when a user triggers `POST /api/v1/pods/{pod}/nudge` (rate-limited to 1 per 6 hours per pod per sender).
+3. **`streak_broken`**: Emitted by the daily streak reset cron job (at 00:05 UTC) to both pod members when a streak is broken.
+4. **`match_found`**: Emitted by the matching worker to both users once they are paired into a pod.
+
+---
+
+### 1. List Notifications (`GET /api/v1/notifications`)
+
+Retrieves cursor-paginated notifications for the authenticated user, ordered newest first (`created_at DESC`).
+
+- **Query Parameters**:
+  - `limit`: Number of items to return (default: `50`, max: `100`).
+  - `before` / `cursor`: Notification ID cursor to fetch items created earlier.
+
+```bash
+curl -X GET "http://localhost:8080/api/v1/notifications?limit=20" \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response (`200 OK`):**
+```json
+{
+  "data": [
+    {
+      "id": "18fba816-11f8-4e89-bdc7-ec527ef3e3db",
+      "user_id": "278c2e90-4b4f-47a7-9477-037dd2e91e18",
+      "type": "new_message",
+      "payload": {
+        "type": "new_message",
+        "pod_id": "346ed098-efc0-4ec1-96a0-6dfd4da3ae39",
+        "title": "New message from Jane",
+        "body": "Hey, did you finish chapter 4 today?"
+      },
+      "sent_at": "2026-10-14T21:40:01Z",
+      "read_at": null,
+      "created_at": "2026-10-14T21:40:00Z"
+    }
+  ],
+  "meta": {
+    "next_cursor": "18fba816-11f8-4e89-bdc7-ec527ef3e3db"
+  },
+  "error": null
+}
+```
+
+---
+
+### 2. Mark Notification as Read (`PATCH /api/v1/notifications/{id}/read`)
+
+Marks a notification as read (`read_at = CURRENT_TIMESTAMP`). Only the recipient/owner can mark a notification as read (`403 Forbidden` otherwise).
+
+```bash
+curl -X PATCH http://localhost:8080/api/v1/notifications/18fba816-11f8-4e89-bdc7-ec527ef3e3db/read \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response (`200 OK`):**
+```json
+{
+  "data": {
+    "id": "18fba816-11f8-4e89-bdc7-ec527ef3e3db",
+    "user_id": "278c2e90-4b4f-47a7-9477-037dd2e91e18",
+    "type": "new_message",
+    "payload": {
+      "type": "new_message",
+      "pod_id": "346ed098-efc0-4ec1-96a0-6dfd4da3ae39",
+      "title": "New message from Jane",
+      "body": "Hey, did you finish chapter 4 today?"
+    },
+    "sent_at": "2026-10-14T21:40:01Z",
+    "read_at": "2026-10-14T21:45:00Z",
+    "created_at": "2026-10-14T21:40:00Z"
   },
   "meta": null,
   "error": null

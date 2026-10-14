@@ -33,9 +33,22 @@ func WithChannelSize(size int) WorkerOption {
 	}
 }
 
+// Notifier defines the interface for emitting notifications.
+type Notifier interface {
+	Send(ctx context.Context, userID, notificationType string, payload map[string]any) error
+}
+
+// WithNotifier configures a notifier for emitting notifications on match found.
+func WithNotifier(n Notifier) WorkerOption {
+	return func(w *Worker) {
+		w.notifier = n
+	}
+}
+
 // Worker is an in-process background worker that processes match requests.
 type Worker struct {
 	repo          *Repository
+	notifier      Notifier
 	requestChan   chan string
 	sweepInterval time.Duration
 	olderThan     time.Duration
@@ -56,6 +69,12 @@ func NewWorker(repo *Repository, opts ...WorkerOption) *Worker {
 	}
 	return w
 }
+
+// SetNotifier sets the notifier on the matching Worker.
+func (w *Worker) SetNotifier(n Notifier) {
+	w.notifier = n
+}
+
 
 // Enqueue sends a request ID to the worker's buffered channel without blocking.
 func (w *Worker) Enqueue(requestID string) {
@@ -175,7 +194,18 @@ func (w *Worker) ProcessRequest(ctx context.Context, requestID string) error {
 				"req_b", item.candidate.ID, "user_b", item.candidate.UserID,
 				"score", item.score,
 			)
+			if w.notifier != nil {
+				payload := map[string]any{
+					"type":   "match_found",
+					"pod_id": podID,
+					"title":  "Match Found!",
+					"body":   "You've been paired with an accountability partner!",
+				}
+				_ = w.notifier.Send(ctx, req.UserID, "match_found", payload)
+				_ = w.notifier.Send(ctx, item.candidate.UserID, "match_found", payload)
+			}
 			return nil
+
 		}
 		if errors.Is(err, ErrPairingConflict) {
 			// One of the requests was no longer open or active pod conflict; continue to next candidate

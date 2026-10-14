@@ -207,3 +207,47 @@ func (h *ProfileHandler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
 
 	OK(w, http.StatusOK, updatedUser)
 }
+
+// UpdateFCMTokenRequest represents the request payload for PATCH /api/v1/profile/fcm-token.
+type UpdateFCMTokenRequest struct {
+	FCMToken string `json:"fcm_token"`
+}
+
+// UpdateFCMToken handles PATCH /api/v1/profile/fcm-token.
+func (h *ProfileHandler) UpdateFCMToken(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.UserFromContext(r.Context())
+	if !ok || user == nil {
+		Fail(w, http.StatusUnauthorized, "UNAUTHORIZED", "user not authenticated")
+		return
+	}
+
+	var req UpdateFCMTokenRequest
+	if err := DecodeJSON(r, &req); err != nil {
+		ValidationError(w, err.Error())
+		return
+	}
+
+	trimmed := strings.TrimSpace(req.FCMToken)
+	if trimmed == "" {
+		ValidationError(w, "fcm_token cannot be empty")
+		return
+	}
+
+	if err := h.usersRepo.UpdateFCMToken(r.Context(), user.ID, &trimmed); err != nil {
+		if errors.Is(err, users.ErrUserNotFound) {
+			Fail(w, http.StatusNotFound, "USER_NOT_FOUND", "user not found")
+			return
+		}
+		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to update fcm token")
+		return
+	}
+
+	freshUser, err := h.usersRepo.GetByID(r.Context(), user.ID)
+	if err != nil {
+		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to load updated profile")
+		return
+	}
+
+	OK(w, http.StatusOK, freshUser)
+}
+

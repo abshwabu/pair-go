@@ -459,3 +459,23 @@ func (r *Repository) ListPodCheckInsByDate(ctx context.Context, podID string, li
 
 	return result, nil
 }
+
+// GetPartnerID returns the user ID of the active partner in the pod (active member where user_id != userID).
+func (r *Repository) GetPartnerID(ctx context.Context, podID, userID string) (string, error) {
+	query := `
+		SELECT user_id
+		FROM pod_members
+		WHERE pod_id = ? AND user_id != ? AND (left_at IS NULL OR left_at = '')
+		LIMIT 1;
+	`
+	var partnerID string
+	err := r.readDB.QueryRowContext(ctx, query, podID, userID).Scan(&partnerID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", errors.New("partner not found in pod")
+		}
+		return "", fmt.Errorf("failed to query partner id: %w", err)
+	}
+	return partnerID, nil
+}
+

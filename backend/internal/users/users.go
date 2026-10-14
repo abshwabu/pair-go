@@ -254,3 +254,35 @@ func (r *Repository) SetAdmin(ctx context.Context, email string, isAdmin bool) e
 
 	return nil
 }
+
+// UpdateFCMToken updates the FCM device push token for a user. If token is nil, sets fcm_token to NULL.
+func (r *Repository) UpdateFCMToken(ctx context.Context, id string, token *string) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	query := `UPDATE users SET fcm_token = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL;`
+	res, err := r.writeDB.ExecContext(ctx, query, token, now, id)
+	if err != nil {
+		return fmt.Errorf("failed to update fcm token: %w", err)
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check rows affected: %w", err)
+	}
+	if rows == 0 {
+		return ErrUserNotFound
+	}
+
+	return nil
+}
+
+// ClearFCMToken clears any user record holding the specified FCM token.
+func (r *Repository) ClearFCMToken(ctx context.Context, token string) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	query := `UPDATE users SET fcm_token = NULL, updated_at = ? WHERE fcm_token = ? AND deleted_at IS NULL;`
+	_, err := r.writeDB.ExecContext(ctx, query, now, token)
+	if err != nil {
+		return fmt.Errorf("failed to clear fcm token: %w", err)
+	}
+	return nil
+}
+
