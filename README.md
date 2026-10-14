@@ -1075,6 +1075,156 @@ curl -X POST http://localhost:8080/api/v1/pods/346ed098-efc0-4ec1-96a0-6dfd4da3a
 
 ---
 
+## Daily Check-Ins & Streaks API
+
+Pair pods track daily accountability through synchronized check-ins and streaks.
+
+### Streak Logic & Invariants
+- **UTC Date Standardization**: Check-in dates are calculated strictly in UTC (`YYYY-MM-DD`). Since paired partners may reside in different timezones, using a uniform UTC date ensures unambiguous daily synchronization.
+- **Both Members Required**: A pod's streak increments by 1 only when **both active members** have checked in for the same UTC date.
+- **Streak Continuity**:
+  - If both active members check in today and `last_check_in_date` is yesterday (or `null`), `current_streak` increments by 1.
+  - If a UTC calendar day passes without both members checking in, `current_streak` resets to 0 (scheduled daily cron job at 00:05 UTC resets stale streaks and emits `streak_broken` notification events).
+  - When members resume checking in after a skipped day, `current_streak` restarts at 1 while `best_streak` is preserved.
+  - Recalculation is idempotent for the same date.
+- **Single Check-In Per Day**: Users can only check in once per UTC date. Duplicate check-in attempts return `409 Conflict`.
+- **Atomic Execution**: Creating a check-in and updating the streak executes within a single write transaction.
+
+---
+
+### 1. Record Check-In (`POST /api/v1/pods/{pod}/check-ins`)
+
+Records a daily check-in for the authenticated member.
+
+- **Request Fields**:
+  - `note`: Optional string up to 500 characters.
+- **Access Control**: Requires authentication and active pod membership (`pods.RequireMember()`).
+- **Conflict Handling**: Returns `409 Conflict` (`CONFLICT`) if the member has already checked in for today's UTC date.
+
+```bash
+curl -X POST http://localhost:8080/api/v1/pods/346ed098-efc0-4ec1-96a0-6dfd4da3ae39/check-ins \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "note": "Read pages 50 to 80 of Dune"
+  }'
+```
+
+**Response (`201 Created`):**
+```json
+{
+  "data": {
+    "id": "e2c36eb9-9132-4752-944a-38411b95b871",
+    "pod_id": "346ed098-efc0-4ec1-96a0-6dfd4da3ae39",
+    "user_id": "278c2e90-4b4f-47a7-9477-037dd2e91e18",
+    "check_in_date": "2026-10-14",
+    "note": "Read pages 50 to 80 of Dune",
+    "created_at": "2026-10-14T20:15:00Z",
+    "current_streak": 3,
+    "best_streak": 5,
+    "last_check_in_date": "2026-10-14",
+    "checked_in_today_by_both": true,
+    "check_in": {
+      "id": "e2c36eb9-9132-4752-944a-38411b95b871",
+      "pod_id": "346ed098-efc0-4ec1-96a0-6dfd4da3ae39",
+      "user_id": "278c2e90-4b4f-47a7-9477-037dd2e91e18",
+      "check_in_date": "2026-10-14",
+      "note": "Read pages 50 to 80 of Dune",
+      "created_at": "2026-10-14T20:15:00Z"
+    },
+    "streak": {
+      "current_streak": 3,
+      "best_streak": 5,
+      "last_check_in_date": "2026-10-14",
+      "checked_in_today_by_both": true
+    }
+  },
+  "meta": null,
+  "error": null
+}
+```
+
+---
+
+### 2. Get Pod Streak Details (`GET /api/v1/pods/{pod}/streak`)
+
+Returns the current streak, best streak, and today's check-in status for both the authenticated user (`me_checked_in_today`) and their partner (`partner_checked_in_today`).
+
+```bash
+curl -X GET http://localhost:8080/api/v1/pods/346ed098-efc0-4ec1-96a0-6dfd4da3ae39/streak \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response (`200 OK`):**
+```json
+{
+  "data": {
+    "current_streak": 3,
+    "best_streak": 5,
+    "last_check_in_date": "2026-10-14",
+    "me_checked_in_today": true,
+    "partner_checked_in_today": true,
+    "both_checked_in_today": true
+  },
+  "meta": null,
+  "error": null
+}
+```
+
+---
+
+### 3. List Check-Ins History (`GET /api/v1/pods/{pod}/check-ins`)
+
+Returns recent daily check-in participation for the pod, ordered most recent first.
+
+- **Query Parameters**:
+  - `limit`: Maximum number of distinct dates to return (default: `60`).
+- **Response Items**:
+  - `date`: UTC date string (`YYYY-MM-DD`).
+  - `member_ids`: Array of member user IDs who checked in on this date.
+  - `both_checked_in`: Boolean indicating if both active members checked in.
+
+```bash
+curl -X GET "http://localhost:8080/api/v1/pods/346ed098-efc0-4ec1-96a0-6dfd4da3ae39/check-ins?limit=60" \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response (`200 OK`):**
+```json
+{
+  "data": [
+    {
+      "date": "2026-10-14",
+      "member_ids": [
+        "278c2e90-4b4f-47a7-9477-037dd2e91e18",
+        "512a80f1-419b-44fa-9043-9828461ab102"
+      ],
+      "both_checked_in": true
+    },
+    {
+      "date": "2026-10-13",
+      "member_ids": [
+        "278c2e90-4b4f-47a7-9477-037dd2e91e18"
+      ],
+      "both_checked_in": false
+    }
+  ],
+  "meta": null,
+  "error": null
+}
+```
+
+---
+
+### 4. Scheduled Jobs (Daily Stale Streak Reset)
+
+The backend runs a daily background cron job (`robfig/cron`) at **00:05 UTC**:
+- Queries active pods (`pods.status = 'active'`) with an active streak (`current_streak > 0`) whose `last_check_in_date` is older than yesterday.
+- Sets `current_streak = 0` in SQLite while preserving `best_streak`.
+- Emits a `streak_broken` event to the notification service.
+
+---
+
 ## Running the Backend
 
 ### Option 1: Docker Compose (Recommended)

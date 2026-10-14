@@ -10,6 +10,7 @@ import (
 
 	"github.com/abshwabu/pair/backend/internal/auth"
 	"github.com/abshwabu/pair/backend/internal/chat"
+	"github.com/abshwabu/pair/backend/internal/checkins"
 	"github.com/abshwabu/pair/backend/internal/config"
 	"github.com/abshwabu/pair/backend/internal/db"
 	"github.com/abshwabu/pair/backend/internal/goals"
@@ -86,6 +87,10 @@ func NewRouterWithWorker(cfg *config.Config, database *db.DB, storageService sto
 	}
 	chatRepo := chat.NewRepository(database.Write, database.Read)
 	chatHandler := chat.NewHandler(chatRepo, chatHub)
+
+	checkinsRepo := checkins.NewRepository(database.Write, database.Read)
+	streakService := checkins.NewStreakService(database.Write, database.Read)
+	checkinsHandler := checkins.NewHandler(checkinsRepo, streakService)
 
 	// /healthz endpoint - responds with HTTP 200 and standard envelope
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -168,6 +173,11 @@ func NewRouterWithWorker(cfg *config.Config, database *db.DB, storageService sto
 				r.Get("/messages", chatHandler.ListMessages)
 				r.Post("/messages", chatHandler.SendMessage)
 				r.Post("/typing", chatHandler.SendTyping)
+
+				// Check-in & Streak routes
+				r.Post("/check-ins", checkinsHandler.CheckIn)
+				r.Get("/check-ins", checkinsHandler.ListCheckIns)
+				r.Get("/streak", checkinsHandler.GetStreak)
 			})
 		})
 	})
