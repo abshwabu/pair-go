@@ -230,3 +230,27 @@ func (r *Repository) UpdateAvatarURL(ctx context.Context, id string, avatarURL s
 
 	return r.GetByID(ctx, id)
 }
+
+// SetAdmin updates the is_admin status for a user identified by email.
+func (r *Repository) SetAdmin(ctx context.Context, email string, isAdmin bool) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	isAdminInt := 0
+	if isAdmin {
+		isAdminInt = 1
+	}
+	query := `UPDATE users SET is_admin = ?, updated_at = ? WHERE LOWER(email) = LOWER(?) AND deleted_at IS NULL;`
+	res, err := r.writeDB.ExecContext(ctx, query, isAdminInt, now, email)
+	if err != nil {
+		return fmt.Errorf("failed to update admin status: %w", err)
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check rows affected: %w", err)
+	}
+	if rows == 0 {
+		return ErrUserNotFound
+	}
+
+	return nil
+}

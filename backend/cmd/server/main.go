@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -18,6 +19,7 @@ import (
 	"github.com/abshwabu/pair/backend/internal/jobs"
 	"github.com/abshwabu/pair/backend/internal/matching"
 	"github.com/abshwabu/pair/backend/internal/storage"
+	"github.com/abshwabu/pair/backend/internal/users"
 )
 
 func main() {
@@ -28,6 +30,9 @@ func main() {
 	slog.SetDefault(logger)
 
 	slog.Info("Starting Pair backend server...")
+
+	makeAdminEmail := flag.String("make-admin", "", "Email of the user to promote to administrator")
+	flag.Parse()
 
 	// 1. Load configuration
 	cfg, err := config.Load()
@@ -47,6 +52,20 @@ func main() {
 			slog.Error("Error closing database connections", "error", err)
 		}
 	}()
+
+	// Handle CLI helper: promote user to administrator
+	if *makeAdminEmail != "" {
+		usersRepo := users.NewRepository(database.Write, database.Read)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := usersRepo.SetAdmin(ctx, *makeAdminEmail, true); err != nil {
+			slog.Error("Failed to promote user to admin", "email", *makeAdminEmail, "error", err)
+			os.Exit(1)
+		}
+		slog.Info("Successfully promoted user to admin", "email", *makeAdminEmail)
+		return
+	}
 
 	// 3. Initialize storage service
 	storageService, err := storage.NewS3StorageFromConfig(context.Background(), cfg)

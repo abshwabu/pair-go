@@ -180,3 +180,24 @@ func (h *Hub) ConnectedClients(podID string) int {
 	}
 	return 0
 }
+
+// ClosePod disconnects all live WebSocket connections for a pod and clears presence.
+func (h *Hub) ClosePod(podID string) {
+	h.mu.Lock()
+	podClients, ok := h.clients[podID]
+	if !ok {
+		h.mu.Unlock()
+		return
+	}
+	clients := make([]*Client, 0, len(podClients))
+	for c := range podClients {
+		clients = append(clients, c)
+	}
+	delete(h.clients, podID)
+	delete(h.presence, podID)
+	h.mu.Unlock()
+
+	for _, c := range clients {
+		c.Close()
+	}
+}

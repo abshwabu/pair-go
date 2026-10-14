@@ -1225,6 +1225,200 @@ The backend runs a daily background cron job (`robfig/cron`) at **00:05 UTC**:
 
 ---
 
+## Safety & Moderation API
+
+Pair provides safety tools for reporting users and blocking peers. Reports can be audited and resolved by system administrators, and blocking a user immediately dissolves any shared pod and terminates active real-time sessions.
+
+### 1. Submit a Report (`POST /api/v1/reports`)
+
+Authenticated users can file a report against another user.
+- `reported_user_id` (required UUID): The user being reported. Cannot report yourself (`400 Bad Request`).
+- `pod_id` (optional UUID): Pod where the issue occurred. If supplied, the reporting user must be an active or past member of the pod.
+- `reason` (required string): Explanation of the issue (10 to 1,000 characters).
+
+```bash
+curl -X POST http://localhost:8080/api/v1/reports \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "reported_user_id": "512a80f1-419b-44fa-9043-9828461ab102",
+    "pod_id": "346ed098-efc0-4ec1-96a0-6dfd4da3ae39",
+    "reason": "Repeated inappropriate messages during check-ins."
+  }'
+```
+
+**Response (`201 Created`):**
+```json
+{
+  "data": {
+    "id": "7649b7da-a3b0-4dbb-8b5e-ca6ef621ce62",
+    "reporter_id": "278c2e90-4b4f-47a7-9477-037dd2e91e18",
+    "reported_user_id": "512a80f1-419b-44fa-9043-9828461ab102",
+    "pod_id": "346ed098-efc0-4ec1-96a0-6dfd4da3ae39",
+    "reason": "Repeated inappropriate messages during check-ins.",
+    "status": "open",
+    "created_at": "2026-10-14T21:40:00Z",
+    "updated_at": "2026-10-14T21:40:00Z"
+  },
+  "meta": null,
+  "error": null
+}
+```
+
+---
+
+### 2. List Reports (Admin Only: `GET /api/v1/reports`)
+
+Protected by `RequireAdmin` middleware. Non-admin users receive `403 Forbidden` (`FORBIDDEN`).
+- **Query Parameters**:
+  - `status`: Filter by status (`open`, `reviewed`, `dismissed`). Defaults to `open`.
+- Returns reports ordered by `created_at DESC`.
+
+```bash
+curl -X GET "http://localhost:8080/api/v1/reports?status=open" \
+  -H "Authorization: Bearer <admin-token>"
+```
+
+**Response (`200 OK`):**
+```json
+{
+  "data": [
+    {
+      "id": "7649b7da-a3b0-4dbb-8b5e-ca6ef621ce62",
+      "reporter_id": "278c2e90-4b4f-47a7-9477-037dd2e91e18",
+      "reported_user_id": "512a80f1-419b-44fa-9043-9828461ab102",
+      "pod_id": "346ed098-efc0-4ec1-96a0-6dfd4da3ae39",
+      "reason": "Repeated inappropriate messages during check-ins.",
+      "status": "open",
+      "created_at": "2026-10-14T21:40:00Z",
+      "updated_at": "2026-10-14T21:40:00Z"
+    }
+  ],
+  "meta": null,
+  "error": null
+}
+```
+
+---
+
+### 3. Update Report Status (Admin Only: `PATCH /api/v1/reports/{id}`)
+
+Protected by `RequireAdmin`. Allows administrators to review or dismiss a report.
+- Body: `{"status": "reviewed"}` or `{"status": "dismissed"}`.
+
+```bash
+curl -X PATCH http://localhost:8080/api/v1/reports/7649b7da-a3b0-4dbb-8b5e-ca6ef621ce62 \
+  -H "Authorization: Bearer <admin-token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "status": "reviewed"
+  }'
+```
+
+**Response (`200 OK`):**
+```json
+{
+  "data": {
+    "id": "7649b7da-a3b0-4dbb-8b5e-ca6ef621ce62",
+    "reporter_id": "278c2e90-4b4f-47a7-9477-037dd2e91e18",
+    "reported_user_id": "512a80f1-419b-44fa-9043-9828461ab102",
+    "pod_id": "346ed098-efc0-4ec1-96a0-6dfd4da3ae39",
+    "reason": "Repeated inappropriate messages during check-ins.",
+    "status": "reviewed",
+    "created_at": "2026-10-14T21:40:00Z",
+    "updated_at": "2026-10-14T21:45:00Z"
+  },
+  "meta": null,
+  "error": null
+}
+```
+
+---
+
+### 4. Block a User (`POST /api/v1/blocks`)
+
+Blocks another user.
+- `blocked_user_id` (required UUID): User to block. Cannot block self (`400 Bad Request`). Duplicate block returns `409 Conflict` (`ALREADY_BLOCKED`).
+- **Immediate Side Effects**:
+  - In the **same database transaction**, if the two users currently share an active pod, the pod is dissolved (`status = 'dissolved'`) and both users are recorded with `left_at = CURRENT_TIMESTAMP`.
+  - Active WebSocket connections for that pod are immediately closed via the chat hub.
+  - Future pod matching requests exclude blocked pairs in candidate evaluation.
+
+```bash
+curl -X POST http://localhost:8080/api/v1/blocks \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "blocked_user_id": "512a80f1-419b-44fa-9043-9828461ab102"
+  }'
+```
+
+**Response (`201 Created`):**
+```json
+{
+  "data": {
+    "id": "8f395719-74d1-4b11-a8ce-164789d6e81f",
+    "user_id": "278c2e90-4b4f-47a7-9477-037dd2e91e18",
+    "blocked_user_id": "512a80f1-419b-44fa-9043-9828461ab102",
+    "created_at": "2026-10-14T21:50:00Z"
+  },
+  "meta": null,
+  "error": null
+}
+```
+
+---
+
+### 5. List Blocks (`GET /api/v1/blocks`)
+
+Retrieves the list of users blocked by the authenticated user, joined with profile information (`name`, `avatar_url`).
+
+```bash
+curl -X GET http://localhost:8080/api/v1/blocks \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response (`200 OK`):**
+```json
+{
+  "data": [
+    {
+      "id": "8f395719-74d1-4b11-a8ce-164789d6e81f",
+      "blocked_user_id": "512a80f1-419b-44fa-9043-9828461ab102",
+      "name": "Jane Doe",
+      "avatar_url": "http://localhost:9000/pair-media/avatars/512a80f1-419b-44fa-9043-9828461ab102/avatar.png",
+      "created_at": "2026-10-14T21:50:00Z"
+    }
+  ],
+  "meta": null,
+  "error": null
+}
+```
+
+---
+
+### 6. Unblock a User (`DELETE /api/v1/blocks/{id}`)
+
+Removes a block. Only the creator of the block can delete it (attempting to delete another user's block returns `403 Forbidden`).
+
+```bash
+curl -X DELETE http://localhost:8080/api/v1/blocks/8f395719-74d1-4b11-a8ce-164789d6e81f \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response (`200 OK`):**
+```json
+{
+  "data": {
+    "message": "unblocked successfully"
+  },
+  "meta": null,
+  "error": null
+}
+```
+
+---
+
 ## Running the Backend
 
 ### Option 1: Docker Compose (Recommended)
@@ -1269,6 +1463,13 @@ Run directly with Go:
 ```bash
 cd backend
 go run cmd/server/main.go
+```
+
+To promote a user to administrator via CLI:
+
+```bash
+cd backend
+go run cmd/server/main.go --make-admin admin@example.com
 ```
 
 To run unit tests:

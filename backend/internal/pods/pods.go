@@ -425,6 +425,15 @@ func (r *Repository) LeaveUser(ctx context.Context, podID, userID string) error 
 		_ = tx.Rollback()
 	}()
 
+	if err := r.LeaveUserTx(ctx, tx, podID, userID); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+// LeaveUserTx performs the member departure within an existing database transaction.
+func (r *Repository) LeaveUserTx(ctx context.Context, tx *sql.Tx, podID, userID string) error {
 	// 1. Check if pod exists
 	var podStatus string
 	if err := tx.QueryRowContext(ctx, `SELECT status FROM pods WHERE id = ?;`, podID).Scan(&podStatus); err != nil {
@@ -437,7 +446,7 @@ func (r *Repository) LeaveUser(ctx context.Context, podID, userID string) error 
 	// 2. Check if user is an active member
 	var memberID string
 	var leftAt *string
-	err = tx.QueryRowContext(ctx, `
+	err := tx.QueryRowContext(ctx, `
 		SELECT id, left_at FROM pod_members
 		WHERE pod_id = ? AND user_id = ?;
 	`, podID, userID).Scan(&memberID, &leftAt)
@@ -492,7 +501,7 @@ func (r *Repository) LeaveUser(ctx context.Context, podID, userID string) error 
 		}
 	}
 
-	return tx.Commit()
+	return nil
 }
 
 // LeaveUser is a package-level function for leaving a pod, reusable by safety/blocks code.
@@ -501,6 +510,14 @@ func LeaveUser(ctx context.Context, podID, userID string) error {
 		return errors.New("pods repository not initialized")
 	}
 	return defaultRepo.LeaveUser(ctx, podID, userID)
+}
+
+// LeaveUserTx is a package-level function for leaving a pod within an existing transaction.
+func LeaveUserTx(ctx context.Context, tx *sql.Tx, podID, userID string) error {
+	if defaultRepo == nil {
+		return errors.New("pods repository not initialized")
+	}
+	return defaultRepo.LeaveUserTx(ctx, tx, podID, userID)
 }
 
 // RequireMemberUser is a package-level function for verifying active pod membership, reusable by handlers/services.

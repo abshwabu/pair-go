@@ -74,3 +74,21 @@ func UserIDFromContext(ctx context.Context) (string, bool) {
 	}
 	return "", false
 }
+
+// RequireAdmin creates a Chi-compatible middleware that ensures the authenticated user is an administrator.
+func RequireAdmin() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			user, ok := auth.UserFromContext(r.Context())
+			if !ok || user == nil {
+				Fail(w, http.StatusUnauthorized, "UNAUTHORIZED", "authentication required")
+				return
+			}
+			if !user.IsAdmin {
+				Fail(w, http.StatusForbidden, "FORBIDDEN", "admin privileges required")
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}

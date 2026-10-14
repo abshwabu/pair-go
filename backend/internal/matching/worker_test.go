@@ -253,3 +253,70 @@ func TestWorker_SweepRetriesOlderRequests(t *testing.T) {
 		t.Errorf("expected req2 to be matched by sweep, got %s", pReq2.Status)
 	}
 }
+
+func TestWorker_BlockedPairsAreNeverMatched(t *testing.T) {
+	database := setupTestDB(t)
+	defer database.Close()
+
+	repo := matching.NewRepository(database.Write, database.Read)
+
+	// Create 2 otherwise perfectly compatible users and goals
+	user1ID, goal1ID := createTestUserAndGoal(t, database, "blocked1@pair.test", "UTC", "en", "read", "steady")
+	user2ID, goal2ID := createTestUserAndGoal(t, database, "blocked2@pair.test", "UTC", "en", "read", "steady")
+
+	// Insert a block: user1 blocked user2
+	now := time.Now().UTC().Format(time.RFC3339)
+	_, err := database.Write.Exec(`
+		INSERT INTO blocks (id, user_id, blocked_user_id, created_at)
+		VALUES (?, ?, ?, ?);
+	`, uuid.NewString(), user1ID, user2ID, now)
+	if err != nil {
+		t.Fatalf("failed to insert block: %v", err)
+	}
+
+	req1 := &matching.PodRequest{
+		ID:                     uuid.NewString(),
+		UserID:                 user1ID,
+		GoalID:                 goal1ID,
+		Status:                 matching.PodRequestStatusOpen,
+		TimezoneToleranceHours: 3,
+		Language:               "en",
+		CreatedAt:              time.Now().UTC(),
+		UpdatedAt:              time.Now().UTC(),
+	}
+	req2 := &matching.PodRequest{
+		ID:                     uuid.NewString(),
+		UserID:                 user2ID,
+		GoalID:                 goal2ID,
+		Status:                 matching.PodRequestStatusOpen,
+		TimezoneToleranceHours: 3,
+		Language:               "en",
+		CreatedAt:              time.Now().UTC(),
+		UpdatedAt:              time.Now().UTC(),
+	}
+
+	if err := repo.Create(context.Background(), req1); err != nil {
+		t.Fatalf("failed to create req1: %v", err)
+	}
+	if err := repo.Create(context.Background(), req2); err != nil {
+		t.Fatalf("failed to create req2: %v", err)
+	}
+
+	worker := matching.NewWorker(repo)
+	ctx := context.Background()
+
+	// Attempt to process match for req1
+	if err := worker.ProcessRequest(ctx, req1.ID); err != nil {
+		t.Fatalf("worker.ProcessRequest failed: %v", err)
+	}
+
+	// Verify both requests remain open
+	pReq1, err := repo.GetByID(ctx, req1.ID)
+	if err != nil || pReq1.Status != matching.PodRequestStatusOpen {
+		t.Fatalf("expected req1 to remain open, got status: %v", pReq1.Status)
+	}
+	pReq2, err := repo.GetByID(ctx, req2.ID)
+	if err != nil || pReq2.Status != matching.PodRequestStatusOpen {
+		t.Fatalf("expected req2 to remain open, got status: %v", pReq2.Status)
+	}
+}

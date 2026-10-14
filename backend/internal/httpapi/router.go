@@ -16,6 +16,7 @@ import (
 	"github.com/abshwabu/pair/backend/internal/goals"
 	"github.com/abshwabu/pair/backend/internal/matching"
 	"github.com/abshwabu/pair/backend/internal/pods"
+	"github.com/abshwabu/pair/backend/internal/safety"
 	"github.com/abshwabu/pair/backend/internal/storage"
 	"github.com/abshwabu/pair/backend/internal/todos"
 	"github.com/abshwabu/pair/backend/internal/users"
@@ -91,6 +92,9 @@ func NewRouterWithWorker(cfg *config.Config, database *db.DB, storageService sto
 	checkinsRepo := checkins.NewRepository(database.Write, database.Read)
 	streakService := checkins.NewStreakService(database.Write, database.Read)
 	checkinsHandler := checkins.NewHandler(checkinsRepo, streakService)
+
+	safetyRepo := safety.NewRepository(database.Write, database.Read)
+	safetyHandler := safety.NewHandler(safetyRepo, podsRepo, chatHub)
 
 	// /healthz endpoint - responds with HTTP 200 and standard envelope
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -179,6 +183,27 @@ func NewRouterWithWorker(cfg *config.Config, database *db.DB, storageService sto
 				r.Get("/check-ins", checkinsHandler.ListCheckIns)
 				r.Get("/streak", checkinsHandler.GetStreak)
 			})
+		})
+
+		// Reports routes
+		r.Route("/reports", func(r chi.Router) {
+			r.Use(authMW)
+			r.Post("/", safetyHandler.CreateReport)
+
+			// Admin-only reports management
+			r.Group(func(r chi.Router) {
+				r.Use(RequireAdmin())
+				r.Get("/", safetyHandler.ListReports)
+				r.Patch("/{id}", safetyHandler.UpdateReport)
+			})
+		})
+
+		// Blocks routes
+		r.Route("/blocks", func(r chi.Router) {
+			r.Use(authMW)
+			r.Post("/", safetyHandler.CreateBlock)
+			r.Get("/", safetyHandler.ListBlocks)
+			r.Delete("/{id}", safetyHandler.DeleteBlock)
 		})
 	})
 
