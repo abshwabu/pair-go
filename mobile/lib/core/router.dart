@@ -4,6 +4,13 @@ import 'package:go_router/go_router.dart';
 
 import 'storage/token_storage.dart';
 import 'theme/app_theme.dart';
+import '../features/auth/login_screen.dart';
+import '../features/auth/signup_screen.dart';
+import '../features/auth/splash_screen.dart';
+import '../features/onboarding/goal_category_screen.dart';
+import '../features/onboarding/goal_detail_screen.dart';
+import '../features/onboarding/matching_prefs_screen.dart';
+import '../features/onboarding/profile_setup_screen.dart';
 
 /// String constants for all route names and paths.
 class AppRoutes {
@@ -163,37 +170,37 @@ GoRouter createRouter({
       GoRoute(
         name: AppRoutes.splash,
         path: AppRoutes.splashPath,
-        builder: (context, state) => const RouteStubScreen(routeName: AppRoutes.splash),
+        builder: (context, state) => const SplashScreen(),
       ),
       GoRoute(
         name: AppRoutes.login,
         path: AppRoutes.loginPath,
-        builder: (context, state) => const RouteStubScreen(routeName: AppRoutes.login),
+        builder: (context, state) => const LoginScreen(),
       ),
       GoRoute(
         name: AppRoutes.signup,
         path: AppRoutes.signupPath,
-        builder: (context, state) => const RouteStubScreen(routeName: AppRoutes.signup),
+        builder: (context, state) => const SignupScreen(),
       ),
       GoRoute(
         name: AppRoutes.profileSetup,
         path: AppRoutes.profileSetupPath,
-        builder: (context, state) => const RouteStubScreen(routeName: AppRoutes.profileSetup),
+        builder: (context, state) => const ProfileSetupScreen(),
       ),
       GoRoute(
         name: AppRoutes.goalCategory,
         path: AppRoutes.goalCategoryPath,
-        builder: (context, state) => const RouteStubScreen(routeName: AppRoutes.goalCategory),
+        builder: (context, state) => const GoalCategoryScreen(),
       ),
       GoRoute(
         name: AppRoutes.goalDetail,
         path: AppRoutes.goalDetailPath,
-        builder: (context, state) => const RouteStubScreen(routeName: AppRoutes.goalDetail),
+        builder: (context, state) => const GoalDetailScreen(),
       ),
       GoRoute(
         name: AppRoutes.matchingPrefs,
         path: AppRoutes.matchingPrefsPath,
-        builder: (context, state) => const RouteStubScreen(routeName: AppRoutes.matchingPrefs),
+        builder: (context, state) => const MatchingPrefsScreen(),
       ),
       GoRoute(
         name: AppRoutes.findingMatch,

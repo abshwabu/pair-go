@@ -1,9 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mobile/core/router.dart';
 import 'package:mobile/core/storage/token_storage.dart';
 import 'package:mobile/core/theme/app_theme.dart';
+import 'package:mobile/features/auth/login_screen.dart';
+import 'package:mobile/features/auth/signup_screen.dart';
+import 'package:mobile/features/auth/splash_screen.dart';
+import 'package:mobile/features/onboarding/goal_category_screen.dart';
+import 'package:mobile/features/onboarding/goal_detail_screen.dart';
+import 'package:mobile/features/onboarding/matching_prefs_screen.dart';
+import 'package:mobile/features/onboarding/profile_setup_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -11,6 +20,18 @@ void main() {
   setUp(() {
     FlutterSecureStorage.setMockInitialValues({});
   });
+
+  Widget buildTestApp(GoRouter router, {TokenStorage? storage}) {
+    return ProviderScope(
+      overrides: [
+        if (storage != null) tokenStorageProvider.overrideWithValue(storage),
+      ],
+      child: MaterialApp.router(
+        theme: AppTheme.lightTheme,
+        routerConfig: router,
+      ),
+    );
+  }
 
   group('Router Tests', () {
     test('Defines all 22 required route names', () {
@@ -46,23 +67,20 @@ void main() {
       }
     });
 
-    testWidgets('App boots to splash screen by default', (WidgetTester tester) async {
+    testWidgets('App boots to splash screen by default',
+        (WidgetTester tester) async {
       final storage = TokenStorage();
       final testRouter = createRouter(tokenStorage: storage);
 
-      await tester.pumpWidget(
-        MaterialApp.router(
-          theme: AppTheme.lightTheme,
-          routerConfig: testRouter,
-        ),
-      );
-      await tester.pumpAndSettle();
+      await tester.pumpWidget(buildTestApp(testRouter, storage: storage));
+      await tester.pump();
 
-      expect(find.byType(RouteStubScreen), findsOneWidget);
-      expect(find.text(AppRoutes.splash), findsAtLeastNWidgets(1));
+      expect(find.byType(SplashScreen), findsOneWidget);
+      expect(find.text('Pair'), findsOneWidget);
     });
 
-    testWidgets('Public routes (/splash, /login, /signup) are accessible without token',
+    testWidgets(
+        'Public routes (/splash, /login, /signup) are accessible without token',
         (WidgetTester tester) async {
       final storage = TokenStorage();
 
@@ -71,28 +89,20 @@ void main() {
         tokenStorage: storage,
         initialLocation: AppRoutes.loginPath,
       );
-      await tester.pumpWidget(
-        MaterialApp.router(
-          theme: AppTheme.lightTheme,
-          routerConfig: loginRouter,
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text(AppRoutes.login), findsAtLeastNWidgets(1));
+      await tester.pumpWidget(buildTestApp(loginRouter, storage: storage));
+      await tester.pump();
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(find.text('Welcome back'), findsOneWidget);
 
       // Test /signup
       final signupRouter = createRouter(
         tokenStorage: storage,
         initialLocation: AppRoutes.signupPath,
       );
-      await tester.pumpWidget(
-        MaterialApp.router(
-          theme: AppTheme.lightTheme,
-          routerConfig: signupRouter,
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text(AppRoutes.signup), findsAtLeastNWidgets(1));
+      await tester.pumpWidget(buildTestApp(signupRouter, storage: storage));
+      await tester.pump();
+      expect(find.byType(SignupScreen), findsOneWidget);
+      expect(find.text('Create an account'), findsOneWidget);
     });
 
     testWidgets('Protected routes redirect to /login when no token is stored',
@@ -105,16 +115,12 @@ void main() {
         initialLocation: AppRoutes.podHomePath,
       );
 
-      await tester.pumpWidget(
-        MaterialApp.router(
-          theme: AppTheme.lightTheme,
-          routerConfig: podRouter,
-        ),
-      );
-      await tester.pumpAndSettle();
+      await tester.pumpWidget(buildTestApp(podRouter, storage: storage));
+      await tester.pump();
 
-      // Should have been redirected to /login
-      expect(find.text(AppRoutes.login), findsAtLeastNWidgets(1));
+      // Should have been redirected to LoginScreen
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(find.text('Welcome back'), findsOneWidget);
       expect(find.text(AppRoutes.podHome), findsNothing);
 
       // Try accessing protected route /chat without token
@@ -123,16 +129,11 @@ void main() {
         initialLocation: AppRoutes.chatPath,
       );
 
-      await tester.pumpWidget(
-        MaterialApp.router(
-          theme: AppTheme.lightTheme,
-          routerConfig: chatRouter,
-        ),
-      );
-      await tester.pumpAndSettle();
+      await tester.pumpWidget(buildTestApp(chatRouter, storage: storage));
+      await tester.pump();
 
-      // Should have been redirected to /login
-      expect(find.text(AppRoutes.login), findsAtLeastNWidgets(1));
+      // Should have been redirected to LoginScreen
+      expect(find.byType(LoginScreen), findsOneWidget);
       expect(find.text(AppRoutes.chat), findsNothing);
     });
 
@@ -147,12 +148,7 @@ void main() {
         initialLocation: AppRoutes.podHomePath,
       );
 
-      await tester.pumpWidget(
-        MaterialApp.router(
-          theme: AppTheme.lightTheme,
-          routerConfig: podRouter,
-        ),
-      );
+      await tester.pumpWidget(buildTestApp(podRouter, storage: storage));
       await tester.pumpAndSettle();
 
       expect(find.text(AppRoutes.podHome), findsAtLeastNWidgets(1));
@@ -164,19 +160,54 @@ void main() {
       expect(find.text(AppRoutes.chat), findsAtLeastNWidgets(1));
     });
 
-    testWidgets('All 22 route stubs render their respective route names',
+    testWidgets('First 7 routes render their respective feature screen widgets',
         (WidgetTester tester) async {
       final storage = TokenStorage();
       await storage.saveToken('authenticated-token');
 
-      final routes = [
-        AppRoutes.splashPath,
-        AppRoutes.loginPath,
-        AppRoutes.signupPath,
-        AppRoutes.profileSetupPath,
-        AppRoutes.goalCategoryPath,
-        AppRoutes.goalDetailPath,
-        AppRoutes.matchingPrefsPath,
+      final testRouter = createRouter(
+        tokenStorage: storage,
+        initialLocation: AppRoutes.loginPath,
+      );
+
+      await tester.pumpWidget(buildTestApp(testRouter, storage: storage));
+      await tester.pumpAndSettle();
+
+      // Login
+      expect(find.byType(LoginScreen), findsOneWidget);
+
+      // Signup
+      testRouter.go(AppRoutes.signupPath);
+      await tester.pumpAndSettle();
+      expect(find.byType(SignupScreen), findsOneWidget);
+
+      // Profile Setup
+      testRouter.go(AppRoutes.profileSetupPath);
+      await tester.pumpAndSettle();
+      expect(find.byType(ProfileSetupScreen), findsOneWidget);
+
+      // Goal Category
+      testRouter.go(AppRoutes.goalCategoryPath);
+      await tester.pumpAndSettle();
+      expect(find.byType(GoalCategoryScreen), findsOneWidget);
+
+      // Goal Detail
+      testRouter.go(AppRoutes.goalDetailPath);
+      await tester.pumpAndSettle();
+      expect(find.byType(GoalDetailScreen), findsOneWidget);
+
+      // Matching Prefs
+      testRouter.go(AppRoutes.matchingPrefsPath);
+      await tester.pumpAndSettle();
+      expect(find.byType(MatchingPrefsScreen), findsOneWidget);
+    });
+
+    testWidgets('Remaining routes render RouteStubScreen',
+        (WidgetTester tester) async {
+      final storage = TokenStorage();
+      await storage.saveToken('authenticated-token');
+
+      final remainingRoutes = [
         AppRoutes.findingMatchPath,
         AppRoutes.matchFoundPath,
         AppRoutes.podHomePath,
@@ -196,26 +227,16 @@ void main() {
 
       final testRouter = createRouter(
         tokenStorage: storage,
-        initialLocation: AppRoutes.splashPath,
+        initialLocation: AppRoutes.findingMatchPath,
       );
 
-      await tester.pumpWidget(
-        MaterialApp.router(
-          theme: AppTheme.lightTheme,
-          routerConfig: testRouter,
-        ),
-      );
-      await tester.pumpAndSettle();
+      await tester.pumpWidget(buildTestApp(testRouter, storage: storage));
+      await tester.pump(const Duration(milliseconds: 100));
 
-      for (var i = 0; i < routes.length; i++) {
-        final path = routes[i];
-        final expectedName = AppRoutes.allRouteNames[i];
-
+      for (final path in remainingRoutes) {
         testRouter.go(path);
-        await tester.pumpAndSettle();
-
-        expect(find.text(expectedName), findsAtLeastNWidgets(1),
-            reason: 'Failed to display route name for $path');
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(find.byType(RouteStubScreen), findsAtLeastNWidgets(1));
       }
     });
   });

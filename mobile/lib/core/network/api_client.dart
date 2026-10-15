@@ -61,7 +61,7 @@ class ApiClient {
                 baseUrl: baseUrl ??
                     const String.fromEnvironment(
                       'API_BASE_URL',
-                      defaultValue: 'http://localhost:8080/api/v1',
+                      defaultValue: 'http://localhost:8085/api/v1',
                     ),
                 connectTimeout: const Duration(seconds: 10),
                 receiveTimeout: const Duration(seconds: 15),
@@ -122,11 +122,17 @@ class ApiClient {
     CancelToken? cancelToken,
   }) async {
     try {
+      Options? effectiveOptions = options;
+      if (data is FormData) {
+        effectiveOptions = (effectiveOptions ?? Options()).copyWith(
+          contentType: 'multipart/form-data',
+        );
+      }
       final response = await dio.post<dynamic>(
         path,
         data: data,
         queryParameters: queryParameters,
-        options: options,
+        options: effectiveOptions,
         cancelToken: cancelToken,
       );
       return _unwrapResponse<T>(response);
