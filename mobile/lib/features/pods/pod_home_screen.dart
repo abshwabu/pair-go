@@ -7,7 +7,8 @@ import '../../core/router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/error_banner.dart';
 import '../auth/auth_state.dart';
-import '../todos/models/todo_model.dart';
+import '../todos/todos_provider.dart';
+import '../todos/widgets/add_edit_todo_modal.dart';
 import 'pod_state.dart';
 
 class PodHomeScreen extends ConsumerStatefulWidget {
@@ -23,9 +24,6 @@ class PodHomeScreen extends ConsumerStatefulWidget {
 }
 
 class _PodHomeScreenState extends ConsumerState<PodHomeScreen> {
-  List<TodoModel> _todosPreview = [];
-  bool _isLoadingTodos = false;
-
   @override
   void initState() {
     super.initState();
@@ -42,38 +40,9 @@ class _PodHomeScreenState extends ConsumerState<PodHomeScreen> {
         );
 
     if (pod != null && mounted) {
-      _fetchTodosPreview(apiClient, pod.id);
-    }
-  }
-
-  Future<void> _fetchTodosPreview(ApiClient apiClient, String podId) async {
-    setState(() {
-      _isLoadingTodos = true;
-    });
-
-    try {
-      final res = await apiClient.get<dynamic>(
-        '/pods/$podId/todos',
-        queryParameters: {'is_done': 'false'},
-      );
-
-      final data = res.data;
-      if (data is List && mounted) {
-        setState(() {
-          _todosPreview = data
-              .take(3)
-              .map((item) => TodoModel.fromJson(item as Map<String, dynamic>))
-              .toList();
-        });
-      }
-    } catch (_) {
-      // Graceful fallback: empty preview list
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoadingTodos = false;
-        });
-      }
+      ref
+          .read(podTodosProvider(pod.id).notifier)
+          .fetchTodos(apiClient: apiClient);
     }
   }
 
@@ -130,6 +99,11 @@ class _PodHomeScreenState extends ConsumerState<PodHomeScreen> {
     final myMembership = pod?.myMembership(currentUser?.id);
     final resolvedPodId = pod?.id ?? widget.podId ?? '';
 
+    // Watch single podTodosProvider so top 3 preview stays synchronized
+    final todosState = ref.watch(podTodosProvider(resolvedPodId));
+    final todosPreview = todosState.top3OpenTodos;
+    final isLoadingTodos = todosState.isLoading;
+
     final categoryName = pod != null && pod.goalCategory.isNotEmpty
         ? '${pod.goalCategory[0].toUpperCase()}${pod.goalCategory.substring(1)} Pod'
         : 'Accountability Pod';
@@ -160,8 +134,10 @@ class _PodHomeScreenState extends ConsumerState<PodHomeScreen> {
                 podId: resolvedPodId,
                 forceRefresh: true,
               );
-          if (mounted) {
-            await _fetchTodosPreview(apiClient, resolvedPodId);
+          if (mounted && resolvedPodId.isNotEmpty) {
+            await ref
+                .read(podTodosProvider(resolvedPodId).notifier)
+                .fetchTodos(apiClient: apiClient, forceRefresh: true);
           }
         },
         child: SingleChildScrollView(
@@ -410,7 +386,7 @@ class _PodHomeScreenState extends ConsumerState<PodHomeScreen> {
 
               const SizedBox(height: AppSpacing.xl),
 
-              // 3. Open Todos Preview Section
+              // 3. Open Todos Preview Section (Wired to podTodosProvider)
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -435,7 +411,7 @@ class _PodHomeScreenState extends ConsumerState<PodHomeScreen> {
 
               const SizedBox(height: AppSpacing.xs),
 
-              if (_isLoadingTodos)
+              if (isLoadingTodos && todosState.todos.isEmpty)
                 Center(
                   child: Padding(
                     padding: const EdgeInsets.all(AppSpacing.lg),
@@ -445,7 +421,7 @@ class _PodHomeScreenState extends ConsumerState<PodHomeScreen> {
                     ),
                   ),
                 )
-              else if (_todosPreview.isEmpty)
+              else if (todosPreview.isEmpty)
                 Card(
                   elevation: 0,
                   color: theme.colorScheme.surfaceContainerHighest,
@@ -472,9 +448,12 @@ class _PodHomeScreenState extends ConsumerState<PodHomeScreen> {
                         ),
                         TextButton(
                           onPressed: () {
-                            context.go(
-                              AppRoutes.todoListPath,
-                              extra: resolvedPodId,
+                            showAddEditTodoModal(
+                              context,
+                              podId: resolvedPodId,
+                              currentUserId: currentUser?.id ?? '',
+                              partnerId: partner?.user.id,
+                              partnerName: partner?.user.name,
                             );
                           },
                           child: const Text('Add'),
@@ -484,7 +463,7 @@ class _PodHomeScreenState extends ConsumerState<PodHomeScreen> {
                   ),
                 )
               else
-                ..._todosPreview.map((todo) {
+                ...todosPreview.map((todo) {
                   return Card(
                     elevation: 0,
                     margin: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -493,18 +472,43 @@ class _PodHomeScreenState extends ConsumerState<PodHomeScreen> {
                       borderRadius: AppRadius.borderRadiusMd,
                     ),
                     child: ListTile(
-                      leading: Icon(
-                        Icons.check_box_outline_blank_rounded,
-                        color: theme.colorScheme.primary,
+                      leading: Transform.scale(
+                        scale: 1.1,
+                        child: Checkbox(
+                          value: todo.isDone,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: AppRadius.borderRadiusSm,
+                          ),
+                          onChanged: (val) async {
+                            final apiClient = ref.read(apiClientProvider);
+                            final ok = await ref
+                                .read(podTodosProvider(resolvedPodId).notifier)
+                                .toggleTodoOptimistic(
+                                  apiClient: apiClient,
+                                  todoId: todo.id,
+                                );
+                            if (!ok && context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Failed to update task.'),
+                                ),
+                              );
+                            }
+                          },
+                        ),
                       ),
                       title: Text(
                         todo.title,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w600,
-                          color: theme.colorScheme.onSurface,
+                          decoration:
+                              todo.isDone ? TextDecoration.lineThrough : null,
+                          color: todo.isDone
+                              ? theme.colorScheme.onSurfaceVariant
+                              : theme.colorScheme.onSurface,
                         ),
                       ),
-                      subtitle: todo.dueDate != null
+                      subtitle: todo.dueDate != null && todo.dueDate!.isNotEmpty
                           ? Text(
                               'Due: ${todo.dueDate}',
                               style: theme.textTheme.bodySmall?.copyWith(
@@ -518,8 +522,8 @@ class _PodHomeScreenState extends ConsumerState<PodHomeScreen> {
                       ),
                       onTap: () {
                         context.go(
-                          AppRoutes.todoListPath,
-                          extra: resolvedPodId,
+                          AppRoutes.todoDetailPath,
+                          extra: {'todo': todo, 'pod_id': resolvedPodId},
                         );
                       },
                     ),

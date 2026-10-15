@@ -17,6 +17,8 @@ import 'package:mobile/features/onboarding/matching_prefs_screen.dart';
 import 'package:mobile/features/onboarding/profile_setup_screen.dart';
 import 'package:mobile/features/pods/pod_home_screen.dart';
 import 'package:mobile/features/pods/pod_settings_screen.dart';
+import 'package:mobile/features/todos/todo_detail_screen.dart';
+import 'package:mobile/features/todos/todo_list_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -154,7 +156,7 @@ void main() {
       expect(find.text(AppRoutes.chat), findsAtLeastNWidgets(1));
     });
 
-    testWidgets('First 11 routes render their respective feature screen widgets',
+    testWidgets('First 13 routes render their respective feature screen widgets',
         (WidgetTester tester) async {
       final storage = TokenStorage();
       await storage.saveToken('authenticated-token');
@@ -215,6 +217,16 @@ void main() {
       await pumpRouter(tester);
       expect(find.byType(PodSettingsScreen), findsOneWidget);
 
+      // 11. Todo List
+      testRouter.go(AppRoutes.todoListPath);
+      await pumpRouter(tester);
+      expect(find.byType(TodoListScreen), findsOneWidget);
+
+      // 12. Todo Detail
+      testRouter.go(AppRoutes.todoDetailPath);
+      await pumpRouter(tester);
+      expect(find.byType(TodoDetailScreen), findsOneWidget);
+
       // Clean up widget tree
       await tester.pumpWidget(const SizedBox());
     });
@@ -225,8 +237,6 @@ void main() {
       await storage.saveToken('authenticated-token');
 
       final remainingRoutes = [
-        AppRoutes.todoListPath,
-        AppRoutes.todoDetailPath,
         AppRoutes.chatPath,
         AppRoutes.checkinPath,
         AppRoutes.streakDetailPath,
@@ -240,7 +250,7 @@ void main() {
 
       final testRouter = createRouter(
         tokenStorage: storage,
-        initialLocation: AppRoutes.todoListPath,
+        initialLocation: AppRoutes.chatPath,
       );
 
       await tester.pumpWidget(buildTestApp(testRouter, storage: storage));

@@ -25,6 +25,40 @@ class TodoModel {
     this.updatedAt,
   });
 
+  bool get isShared => assignedTo == null || assignedTo == 'shared' || assignedTo!.isEmpty;
+
+  TodoModel copyWith({
+    String? id,
+    String? podId,
+    String? createdBy,
+    String? assignedTo,
+    bool clearAssignedTo = false,
+    String? title,
+    String? notes,
+    bool clearNotes = false,
+    String? dueDate,
+    bool clearDueDate = false,
+    bool? isDone,
+    DateTime? completedAt,
+    bool clearCompletedAt = false,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return TodoModel(
+      id: id ?? this.id,
+      podId: podId ?? this.podId,
+      createdBy: createdBy ?? this.createdBy,
+      assignedTo: clearAssignedTo ? null : (assignedTo ?? this.assignedTo),
+      title: title ?? this.title,
+      notes: clearNotes ? null : (notes ?? this.notes),
+      dueDate: clearDueDate ? null : (dueDate ?? this.dueDate),
+      isDone: isDone ?? this.isDone,
+      completedAt: clearCompletedAt ? null : (completedAt ?? this.completedAt),
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
   factory TodoModel.fromJson(Map<String, dynamic> json) {
     return TodoModel(
       id: json['id'] as String? ?? '',

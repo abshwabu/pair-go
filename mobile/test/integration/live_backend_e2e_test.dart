@@ -7,6 +7,7 @@ import 'package:mobile/features/auth/models/user_model.dart';
 import 'package:mobile/features/goals/models/goal_model.dart';
 import 'package:mobile/features/matching/models/matching_request_model.dart';
 import 'package:mobile/features/pods/models/pod_model.dart';
+import 'package:mobile/features/todos/models/todo_model.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -251,7 +252,77 @@ void main() {
       expect(partner.user.name, 'User Beta');
       expect(partner.goal.title, 'Read Dune Chronicles');
 
-      // 5. User A leaves pod via POST /pods/{id}/leave
+      // 5. Test Todo CRUD in active pod
+      // 5a. User A creates a personal todo
+      final createTodoResA = await userAApi.post<Map<String, dynamic>>(
+        '/pods/$matchedPodId/todos',
+        data: {
+          'title': 'Read Chapters 1 to 3',
+          'notes': 'Pages 1-85',
+          'due_date': '2026-10-25',
+          'assigned_to': userAId,
+        },
+      );
+      final todoA = TodoModel.fromJson(createTodoResA.data);
+      expect(todoA.id.isNotEmpty, isTrue);
+      expect(todoA.title, 'Read Chapters 1 to 3');
+      expect(todoA.notes, 'Pages 1-85');
+      expect(todoA.dueDate, '2026-10-25');
+      expect(todoA.assignedTo, userAId);
+      expect(todoA.isDone, isFalse);
+
+      // 5b. User B creates a shared todo
+      final createTodoResB = await userBApi.post<Map<String, dynamic>>(
+        '/pods/$matchedPodId/todos',
+        data: {
+          'title': 'Weekly Chapter Discussion',
+          'notes': 'Discuss worldbuilding on Saturday',
+          'assigned_to': null,
+        },
+      );
+      final todoB = TodoModel.fromJson(createTodoResB.data);
+      expect(todoB.title, 'Weekly Chapter Discussion');
+      expect(todoB.isShared, isTrue);
+
+      // 5c. User A lists todos via GET /pods/{pod}/todos
+      final listRes = await userAApi.get<dynamic>('/pods/$matchedPodId/todos');
+      final listData = (listRes.data as List)
+          .map((item) => TodoModel.fromJson(item as Map<String, dynamic>))
+          .toList();
+      expect(listData.length, 2);
+
+      // 5d. User A toggles completion via PATCH /pods/{pod}/todos/{todo}
+      final patchRes = await userAApi.patch<Map<String, dynamic>>(
+        '/pods/$matchedPodId/todos/${todoA.id}',
+        data: {'is_done': true},
+      );
+      final patchedTodoA = TodoModel.fromJson(patchRes.data);
+      expect(patchedTodoA.isDone, isTrue);
+      expect(patchedTodoA.completedAt, isNotNull);
+
+      // 5e. User B updates the shared todo
+      final updateRes = await userBApi.patch<Map<String, dynamic>>(
+        '/pods/$matchedPodId/todos/${todoB.id}',
+        data: {
+          'title': 'Weekly Discussion on Sunday',
+          'due_date': '2026-10-26',
+        },
+      );
+      final updatedTodoB = TodoModel.fromJson(updateRes.data);
+      expect(updatedTodoB.title, 'Weekly Discussion on Sunday');
+      expect(updatedTodoB.dueDate, '2026-10-26');
+
+      // 5f. User A deletes their completed todo via DELETE /pods/{pod}/todos/{todo}
+      final delRes = await userAApi.delete<Map<String, dynamic>>(
+        '/pods/$matchedPodId/todos/${todoA.id}',
+      );
+      expect(delRes.data['message'], contains('deleted'));
+
+      // 5g. Verify list now has 1 todo
+      final listAfterDel = await userAApi.get<dynamic>('/pods/$matchedPodId/todos');
+      expect((listAfterDel.data as List).length, 1);
+
+      // 6. User A leaves pod via POST /pods/{id}/leave
       final leaveRes = await userAApi.post<Map<String, dynamic>>('/pods/$matchedPodId/leave');
       expect(leaveRes.data['message'], 'left pod successfully');
 

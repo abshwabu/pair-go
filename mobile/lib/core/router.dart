@@ -15,6 +15,9 @@ import '../features/onboarding/matching_prefs_screen.dart';
 import '../features/onboarding/profile_setup_screen.dart';
 import '../features/pods/pod_home_screen.dart';
 import '../features/pods/pod_settings_screen.dart';
+import '../features/todos/models/todo_model.dart';
+import '../features/todos/todo_detail_screen.dart';
+import '../features/todos/todo_list_screen.dart';
 
 /// String constants for all route names and paths.
 class AppRoutes {
@@ -244,12 +247,43 @@ GoRouter createRouter({
       GoRoute(
         name: AppRoutes.todoList,
         path: AppRoutes.todoListPath,
-        builder: (context, state) => const RouteStubScreen(routeName: AppRoutes.todoList),
+        builder: (context, state) {
+          final podId = state.extra as String? ??
+              state.uri.queryParameters['pod_id'] ??
+              state.uri.queryParameters['id'];
+          return TodoListScreen(podId: podId);
+        },
       ),
       GoRoute(
         name: AppRoutes.todoDetail,
         path: AppRoutes.todoDetailPath,
-        builder: (context, state) => const RouteStubScreen(routeName: AppRoutes.todoDetail),
+        builder: (context, state) {
+          TodoModel? todo;
+          String? todoId;
+          String? podId;
+
+          if (state.extra is TodoModel) {
+            todo = state.extra as TodoModel;
+            todoId = todo.id;
+            podId = todo.podId;
+          } else if (state.extra is Map<String, dynamic>) {
+            final extraMap = state.extra as Map<String, dynamic>;
+            if (extraMap['todo'] is TodoModel) {
+              todo = extraMap['todo'] as TodoModel;
+            }
+            todoId = extraMap['todo_id'] as String? ?? extraMap['id'] as String?;
+            podId = extraMap['pod_id'] as String?;
+          }
+
+          todoId ??= state.uri.queryParameters['id'] ?? state.uri.queryParameters['todo_id'];
+          podId ??= state.uri.queryParameters['pod_id'];
+
+          return TodoDetailScreen(
+            todo: todo,
+            todoId: todoId,
+            podId: podId,
+          );
+        },
       ),
       GoRoute(
         name: AppRoutes.chat,
