@@ -71,10 +71,17 @@ func main() {
 	}
 
 	// 3. Initialize storage service
-	storageService, err := storage.NewS3StorageFromConfig(context.Background(), cfg)
-	if err != nil {
-		slog.Error("Failed to initialize S3 storage", "error", err)
-		os.Exit(1)
+	var storageService storage.StorageService
+	if cfg.S3AccessKey != "" || cfg.S3Endpoint != "" {
+		s3Storage, err := storage.NewS3StorageFromConfig(context.Background(), cfg)
+		if err != nil {
+			slog.Error("Failed to initialize S3 storage", "error", err)
+			os.Exit(1)
+		}
+		storageService = s3Storage
+	} else {
+		slog.Info("S3 storage not configured; using in-memory storage")
+		storageService = storage.NewFakeStorage(cfg.S3PublicBaseURL)
 	}
 
 	// 4. Initialize matching worker and start background processing

@@ -12,6 +12,7 @@ import 'package:mobile/features/auth/splash_screen.dart';
 import 'package:mobile/features/matching/finding_match_screen.dart';
 import 'package:mobile/features/matching/match_found_screen.dart';
 import 'package:mobile/features/onboarding/goal_category_screen.dart';
+import 'package:mobile/features/chat/chat_screen.dart';
 import 'package:mobile/features/onboarding/goal_detail_screen.dart';
 import 'package:mobile/features/onboarding/matching_prefs_screen.dart';
 import 'package:mobile/features/onboarding/profile_setup_screen.dart';
@@ -153,10 +154,10 @@ void main() {
       podRouter.go(AppRoutes.chatPath);
       await pumpRouter(tester);
 
-      expect(find.text(AppRoutes.chat), findsAtLeastNWidgets(1));
+      expect(find.byType(ChatScreen), findsOneWidget);
     });
 
-    testWidgets('First 13 routes render their respective feature screen widgets',
+    testWidgets('First 14 routes render their respective feature screen widgets',
         (WidgetTester tester) async {
       final storage = TokenStorage();
       await storage.saveToken('authenticated-token');
@@ -227,6 +228,11 @@ void main() {
       await pumpRouter(tester);
       expect(find.byType(TodoDetailScreen), findsOneWidget);
 
+      // 13. Chat
+      testRouter.go(AppRoutes.chatPath);
+      await pumpRouter(tester);
+      expect(find.byType(ChatScreen), findsOneWidget);
+
       // Clean up widget tree
       await tester.pumpWidget(const SizedBox());
     });
@@ -237,7 +243,6 @@ void main() {
       await storage.saveToken('authenticated-token');
 
       final remainingRoutes = [
-        AppRoutes.chatPath,
         AppRoutes.checkinPath,
         AppRoutes.streakDetailPath,
         AppRoutes.streakRecoveryPath,
@@ -250,7 +255,7 @@ void main() {
 
       final testRouter = createRouter(
         tokenStorage: storage,
-        initialLocation: AppRoutes.chatPath,
+        initialLocation: AppRoutes.checkinPath,
       );
 
       await tester.pumpWidget(buildTestApp(testRouter, storage: storage));

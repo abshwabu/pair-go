@@ -105,6 +105,7 @@ func NewRouterWithWorker(cfg *config.Config, database *db.DB, storageService sto
 		worker.SetNotifier(notificationsService)
 	}
 	chatHandler.SetNotifier(notificationsService, podsRepo)
+	chatHandler.SetStorageService(storageService)
 	checkinsHandler.SetNotifier(notificationsService)
 
 	// /healthz endpoint - responds with HTTP 200 and standard envelope
@@ -189,6 +190,7 @@ func NewRouterWithWorker(cfg *config.Config, database *db.DB, storageService sto
 				r.Get("/messages", chatHandler.ListMessages)
 				r.Post("/messages", chatHandler.SendMessage)
 				r.Post("/typing", chatHandler.SendTyping)
+				r.Post("/attachments", chatHandler.UploadAttachment)
 
 				// Check-in & Streak routes
 				r.Post("/check-ins", checkinsHandler.CheckIn)

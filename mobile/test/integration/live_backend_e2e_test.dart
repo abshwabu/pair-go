@@ -1,9 +1,12 @@
 import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/core/network/api_client.dart';
+import 'package:mobile/core/network/realtime_client.dart';
 import 'package:mobile/core/storage/token_storage.dart';
 import 'package:mobile/features/auth/models/user_model.dart';
+import 'package:mobile/features/chat/models/chat_message_model.dart';
 import 'package:mobile/features/goals/models/goal_model.dart';
 import 'package:mobile/features/matching/models/matching_request_model.dart';
 import 'package:mobile/features/pods/models/pod_model.dart';
@@ -321,6 +324,113 @@ void main() {
       // 5g. Verify list now has 1 todo
       final listAfterDel = await userAApi.get<dynamic>('/pods/$matchedPodId/todos');
       expect((listAfterDel.data as List).length, 1);
+
+      // 5h. Realtime Chat & Attachments via WebSocket and REST
+      final clientA = RealtimeClient(
+        tokenStorage: userAStorage,
+        baseUrl: 'http://localhost:8085/api/v1',
+      );
+      final clientB = RealtimeClient(
+        tokenStorage: userBStorage,
+        baseUrl: 'http://localhost:8085/api/v1',
+      );
+
+      final eventsA = <RealtimeEvent>[];
+      final eventsB = <RealtimeEvent>[];
+      final subA = clientA.events.listen(eventsA.add);
+      final subB = clientB.events.listen(eventsB.add);
+
+      // Connect both users to WebSocket hub
+      await clientA.connect(matchedPodId);
+      await clientB.connect(matchedPodId);
+      expect(clientA.currentStatus, RealtimeConnectionStatus.connected);
+      expect(clientB.currentStatus, RealtimeConnectionStatus.connected);
+
+      // User A sends message via REST
+      final sendMsgResA = await userAApi.post<Map<String, dynamic>>(
+        '/pods/$matchedPodId/messages',
+        data: {'body': 'Hello partner, let us reach 10k steps today!'},
+      );
+      final sentMsgA = ChatMessageModel.fromJson(sendMsgResA.data);
+      expect(sentMsgA.body, 'Hello partner, let us reach 10k steps today!');
+      expect(sentMsgA.senderId, userAId);
+
+      // User B receives the message event live over WebSocket
+      await Future.delayed(const Duration(milliseconds: 300));
+      expect(
+        eventsB.any((e) =>
+            e.type == RealtimeEventType.message &&
+            e.data['body'] == sentMsgA.body),
+        isTrue,
+      );
+
+      // User B posts typing indicator
+      await userBApi.post<dynamic>('/pods/$matchedPodId/typing');
+      await Future.delayed(const Duration(milliseconds: 300));
+      expect(
+        eventsA.any((e) =>
+            e.type == RealtimeEventType.typing &&
+            e.data['user_id'] == userBId),
+        isTrue,
+      );
+
+      // User A uploads photo attachment proof
+      final tempDir = await Directory.systemTemp.createTemp('pair_attachment_test');
+      final testFile = File('${tempDir.path}/proof.jpg');
+      await testFile.writeAsBytes([
+        0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01,
+      ]);
+
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(testFile.path, filename: 'proof.jpg'),
+      });
+      final uploadRes = await userAApi.post<Map<String, dynamic>>(
+        '/pods/$matchedPodId/attachments',
+        data: formData,
+      );
+      expect(uploadRes.data['url'], isNotNull);
+      final attachmentUrl = uploadRes.data['url'] as String;
+      expect(attachmentUrl.isNotEmpty, isTrue);
+
+      // User A sends message with attachment
+      final sendMsgWithAttachmentRes = await userAApi.post<Map<String, dynamic>>(
+        '/pods/$matchedPodId/messages',
+        data: {
+          'body': 'Here is my workout photo proof!',
+          'attachment_url': attachmentUrl,
+        },
+      );
+      final msgWithAttachment =
+          ChatMessageModel.fromJson(sendMsgWithAttachmentRes.data);
+      expect(msgWithAttachment.attachmentUrl, attachmentUrl);
+
+      // User B receives message with attachment over WebSocket
+      await Future.delayed(const Duration(milliseconds: 300));
+      expect(
+        eventsB.any((e) =>
+            e.type == RealtimeEventType.message &&
+            e.data['attachment_url'] == attachmentUrl),
+        isTrue,
+      );
+
+      // Verify cursor pagination on GET /pods/{pod}/messages
+      final historyRes =
+          await userAApi.get<dynamic>('/pods/$matchedPodId/messages?limit=1');
+      expect((historyRes.data as List).length, 1);
+      final nextCursor = historyRes.meta?['next_cursor'] as String?;
+      expect(nextCursor, isNotNull);
+
+      final nextHistoryRes = await userAApi.get<dynamic>(
+        '/pods/$matchedPodId/messages?before=$nextCursor&limit=1',
+      );
+      expect((nextHistoryRes.data as List).isNotEmpty, isTrue);
+
+      // Cleanup realtime clients and temp directory
+      await subA.cancel();
+      await subB.cancel();
+      clientA.dispose();
+      clientB.dispose();
+      await tempDir.delete(recursive: true);
 
       // 6. User A leaves pod via POST /pods/{id}/leave
       final leaveRes = await userAApi.post<Map<String, dynamic>>('/pods/$matchedPodId/leave');

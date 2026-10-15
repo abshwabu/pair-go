@@ -17,6 +17,7 @@ import (
 
 	"github.com/abshwabu/pair/backend/internal/auth"
 	"github.com/abshwabu/pair/backend/internal/pods"
+	"github.com/abshwabu/pair/backend/internal/storage"
 )
 
 // Notifier defines the interface for emitting notifications.
@@ -33,6 +34,7 @@ type PartnerResolver interface {
 type Handler struct {
 	repo            *Repository
 	hub             *Hub
+	storageService  storage.StorageService
 	notifier        Notifier
 	partnerResolver PartnerResolver
 }
@@ -43,6 +45,11 @@ func NewHandler(repo *Repository, hub *Hub) *Handler {
 		repo: repo,
 		hub:  hub,
 	}
+}
+
+// SetStorageService sets the storage service on the Handler.
+func (h *Handler) SetStorageService(s storage.StorageService) {
+	h.storageService = s
 }
 
 // SetNotifier sets the notification service and partner resolver on the Handler.
@@ -61,6 +68,7 @@ func (h *Handler) RegisterRoutes(r chi.Router, authMW func(http.Handler) http.Ha
 		r.Get("/messages", h.ListMessages)
 		r.Post("/messages", h.SendMessage)
 		r.Post("/typing", h.SendTyping)
+		r.Post("/attachments", h.UploadAttachment)
 	})
 }
 
@@ -340,4 +348,95 @@ func (h *Handler) SendTyping(w http.ResponseWriter, r *http.Request) {
 	}, user.ID)
 
 	respondJSON(w, http.StatusOK, map[string]bool{"ok": true}, nil)
+}
+
+// UploadAttachment handles POST /api/v1/pods/{pod}/attachments.
+// Multipart field "file", member-only, image types only (jpeg, png, webp, gif), max 5MB.
+// S3 key: attachments/{pod_id}/{uuid}.{ext}
+// Returns { "url": publicURL }.
+func (h *Handler) UploadAttachment(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.UserFromContext(r.Context())
+	if !ok || user == nil {
+		respondError(w, http.StatusUnauthorized, "UNAUTHORIZED", "user not authenticated")
+		return
+	}
+
+	podID := extractPodID(r)
+	if podID == "" {
+		respondError(w, http.StatusBadRequest, "VALIDATION_ERROR", "missing pod id")
+		return
+	}
+
+	if h.storageService == nil {
+		respondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "storage service unavailable")
+		return
+	}
+
+	const maxFileSize = 5 * 1024 * 1024 // 5MB
+	r.Body = http.MaxBytesReader(w, r.Body, maxFileSize+(1<<20))
+
+	if err := r.ParseMultipartForm(maxFileSize + (1 << 20)); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) || strings.Contains(err.Error(), "request body too large") {
+			respondError(w, http.StatusBadRequest, "FILE_TOO_LARGE", "file exceeds maximum allowed size of 5MB")
+			return
+		}
+		respondError(w, http.StatusBadRequest, "VALIDATION_ERROR", fmt.Sprintf("failed to parse multipart form: %v", err))
+		return
+	}
+
+	file, fileHeader, err := r.FormFile("file")
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "VALIDATION_ERROR", "missing required file field 'file'")
+		return
+	}
+	defer file.Close()
+
+	if fileHeader.Size > maxFileSize {
+		respondError(w, http.StatusBadRequest, "FILE_TOO_LARGE", "file exceeds maximum allowed size of 5MB")
+		return
+	}
+
+	buf := make([]byte, 512)
+	n, err := file.Read(buf)
+	if err != nil && !errors.Is(err, io.EOF) {
+		respondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to read uploaded file")
+		return
+	}
+	if n == 0 {
+		respondError(w, http.StatusBadRequest, "VALIDATION_ERROR", "file cannot be empty")
+		return
+	}
+
+	contentType := http.DetectContentType(buf[:n])
+	var ext string
+	switch contentType {
+	case "image/jpeg":
+		ext = "jpg"
+	case "image/png":
+		ext = "png"
+	case "image/webp":
+		ext = "webp"
+	case "image/gif":
+		ext = "gif"
+	default:
+		respondError(w, http.StatusBadRequest, "INVALID_FILE_TYPE", "invalid file type: only image types are allowed")
+		return
+	}
+
+	if seeker, ok := file.(io.Seeker); ok {
+		if _, err := seeker.Seek(0, io.SeekStart); err != nil {
+			respondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to rewind file stream")
+			return
+		}
+	}
+
+	key := fmt.Sprintf("attachments/%s/%s.%s", podID, uuid.NewString(), ext)
+	publicURL, err := h.storageService.Upload(r.Context(), key, file, contentType)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "STORAGE_ERROR", "failed to upload attachment")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{"url": publicURL}, nil)
 }
