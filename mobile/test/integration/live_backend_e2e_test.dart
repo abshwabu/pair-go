@@ -7,6 +7,7 @@ import 'package:mobile/core/network/realtime_client.dart';
 import 'package:mobile/core/storage/token_storage.dart';
 import 'package:mobile/features/auth/models/user_model.dart';
 import 'package:mobile/features/chat/models/chat_message_model.dart';
+import 'package:mobile/features/checkins/models/streak_model.dart';
 import 'package:mobile/features/goals/models/goal_model.dart';
 import 'package:mobile/features/matching/models/matching_request_model.dart';
 import 'package:mobile/features/pods/models/pod_model.dart';
@@ -340,6 +341,19 @@ void main() {
       final subA = clientA.events.listen(eventsA.add);
       final subB = clientB.events.listen(eventsB.add);
 
+      Future<bool> waitForEvent(
+        List<RealtimeEvent> events,
+        bool Function(RealtimeEvent) predicate, {
+        Duration timeout = const Duration(seconds: 3),
+      }) async {
+        final stopwatch = Stopwatch()..start();
+        while (stopwatch.elapsed < timeout) {
+          if (events.any(predicate)) return true;
+          await Future.delayed(const Duration(milliseconds: 50));
+        }
+        return events.any(predicate);
+      }
+
       // Connect both users to WebSocket hub
       await clientA.connect(matchedPodId);
       await clientB.connect(matchedPodId);
@@ -356,23 +370,23 @@ void main() {
       expect(sentMsgA.senderId, userAId);
 
       // User B receives the message event live over WebSocket
-      await Future.delayed(const Duration(milliseconds: 300));
-      expect(
-        eventsB.any((e) =>
+      final receivedMsgB = await waitForEvent(
+        eventsB,
+        (e) =>
             e.type == RealtimeEventType.message &&
-            e.data['body'] == sentMsgA.body),
-        isTrue,
+            e.data['body'] == sentMsgA.body,
       );
+      expect(receivedMsgB, isTrue);
 
       // User B posts typing indicator
       await userBApi.post<dynamic>('/pods/$matchedPodId/typing');
-      await Future.delayed(const Duration(milliseconds: 300));
-      expect(
-        eventsA.any((e) =>
+      final receivedTypingA = await waitForEvent(
+        eventsA,
+        (e) =>
             e.type == RealtimeEventType.typing &&
-            e.data['user_id'] == userBId),
-        isTrue,
+            e.data['user_id'] == userBId,
       );
+      expect(receivedTypingA, isTrue);
 
       // User A uploads photo attachment proof
       final tempDir = await Directory.systemTemp.createTemp('pair_attachment_test');
@@ -405,13 +419,13 @@ void main() {
       expect(msgWithAttachment.attachmentUrl, attachmentUrl);
 
       // User B receives message with attachment over WebSocket
-      await Future.delayed(const Duration(milliseconds: 300));
-      expect(
-        eventsB.any((e) =>
+      final receivedAttachmentB = await waitForEvent(
+        eventsB,
+        (e) =>
             e.type == RealtimeEventType.message &&
-            e.data['attachment_url'] == attachmentUrl),
-        isTrue,
+            e.data['attachment_url'] == attachmentUrl,
       );
+      expect(receivedAttachmentB, isTrue);
 
       // Verify cursor pagination on GET /pods/{pod}/messages
       final historyRes =
@@ -431,6 +445,84 @@ void main() {
       clientA.dispose();
       clientB.dispose();
       await tempDir.delete(recursive: true);
+
+      // 5i. Check-ins, Streak Updates, and Rate-Limited Nudge
+      // Check initial streak details for User A
+      final streakResA1 = await userAApi.get<Map<String, dynamic>>('/pods/$matchedPodId/streak');
+      final initialStreakA = PodStreakDetails.fromJson(streakResA1.data);
+      expect(initialStreakA.currentStreak, 0);
+      expect(initialStreakA.meCheckedInToday, isFalse);
+      expect(initialStreakA.partnerCheckedInToday, isFalse);
+      expect(initialStreakA.bothCheckedInToday, isFalse);
+
+      // User A records daily check-in
+      final checkInResA = await userAApi.post<Map<String, dynamic>>(
+        '/pods/$matchedPodId/check-ins',
+        data: {'note': 'Morning 5k completed!'},
+      );
+      final checkInResultA = CheckInResult.fromJson(checkInResA.data);
+      expect(checkInResultA.userId, userAId);
+      expect(checkInResultA.note, 'Morning 5k completed!');
+      expect(checkInResultA.currentStreak, 0); // only 1 user checked in so far
+      expect(checkInResultA.checkedInTodayByBoth, isFalse);
+
+      // User A duplicate check-in today returns 409 Conflict
+      try {
+        await userAApi.post<Map<String, dynamic>>(
+          '/pods/$matchedPodId/check-ins',
+          data: {'note': 'Second checkin attempt'},
+        );
+        fail('Expected 409 Conflict for duplicate check-in');
+      } on ApiException catch (e) {
+        expect(e.statusCode, 409);
+        expect(e.code, 'CONFLICT');
+      }
+
+      // Verify User A streak now shows me_checked_in_today = true
+      final streakResA2 = await userAApi.get<Map<String, dynamic>>('/pods/$matchedPodId/streak');
+      final updatedStreakA = PodStreakDetails.fromJson(streakResA2.data);
+      expect(updatedStreakA.meCheckedInToday, isTrue);
+      expect(updatedStreakA.partnerCheckedInToday, isFalse);
+
+      // User A nudges User B
+      final nudgeRes = await userAApi.post<Map<String, dynamic>>('/pods/$matchedPodId/nudge');
+      expect(nudgeRes.data['message'], 'nudge sent successfully');
+
+      // User A nudges again immediately -> 429 Rate limited
+      try {
+        await userAApi.post<Map<String, dynamic>>('/pods/$matchedPodId/nudge');
+        fail('Expected 429 Too Many Requests for rapid nudge');
+      } on ApiException catch (e) {
+        expect(e.statusCode, 429);
+        expect(e.code, 'RATE_LIMITED');
+      }
+
+      // User B records check-in -> streak increments to 1!
+      final checkInResB = await userBApi.post<Map<String, dynamic>>(
+        '/pods/$matchedPodId/check-ins',
+        data: {'note': 'Finished yoga flow!'},
+      );
+      final checkInResultB = CheckInResult.fromJson(checkInResB.data);
+      expect(checkInResultB.userId, userBId);
+      expect(checkInResultB.currentStreak, 1);
+      expect(checkInResultB.checkedInTodayByBoth, isTrue);
+
+      // Both users now see current_streak = 1 and both_checked_in_today = true
+      final streakResA3 = await userAApi.get<Map<String, dynamic>>('/pods/$matchedPodId/streak');
+      final finalStreakA = PodStreakDetails.fromJson(streakResA3.data);
+      expect(finalStreakA.currentStreak, 1);
+      expect(finalStreakA.bestStreak, greaterThanOrEqualTo(1));
+      expect(finalStreakA.bothCheckedInToday, isTrue);
+
+      // Check-in history marks both completed
+      final checkinsHistoryRes =
+          await userAApi.get<dynamic>('/pods/$matchedPodId/check-ins?limit=60');
+      final historyList = (checkinsHistoryRes.data as List)
+          .map((i) => DailyCheckInItem.fromJson(i as Map<String, dynamic>))
+          .toList();
+      expect(historyList.isNotEmpty, isTrue);
+      expect(historyList.first.bothCheckedIn, isTrue);
+      expect(historyList.first.memberIds.length, 2);
 
       // 6. User A leaves pod via POST /pods/{id}/leave
       final leaveRes = await userAApi.post<Map<String, dynamic>>('/pods/$matchedPodId/leave');

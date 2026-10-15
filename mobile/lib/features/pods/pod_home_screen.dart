@@ -9,6 +9,9 @@ import '../../core/widgets/error_banner.dart';
 import '../auth/auth_state.dart';
 import '../todos/todos_provider.dart';
 import '../todos/widgets/add_edit_todo_modal.dart';
+import '../checkins/streak_provider.dart';
+import '../checkins/widgets/daily_checkin_card.dart';
+import '../checkins/widgets/streak_badge.dart';
 import 'pod_state.dart';
 
 class PodHomeScreen extends ConsumerStatefulWidget {
@@ -43,6 +46,9 @@ class _PodHomeScreenState extends ConsumerState<PodHomeScreen> {
       ref
           .read(podTodosProvider(pod.id).notifier)
           .fetchTodos(apiClient: apiClient);
+      ref
+          .read(podStreakProvider(pod.id).notifier)
+          .fetchStreak(apiClient);
     }
   }
 
@@ -135,9 +141,14 @@ class _PodHomeScreenState extends ConsumerState<PodHomeScreen> {
                 forceRefresh: true,
               );
           if (mounted && resolvedPodId.isNotEmpty) {
-            await ref
-                .read(podTodosProvider(resolvedPodId).notifier)
-                .fetchTodos(apiClient: apiClient, forceRefresh: true);
+            await Future.wait([
+              ref
+                  .read(podTodosProvider(resolvedPodId).notifier)
+                  .fetchTodos(apiClient: apiClient, forceRefresh: true),
+              ref
+                  .read(podStreakProvider(resolvedPodId).notifier)
+                  .fetchStreak(apiClient, forceRefresh: true),
+            ]);
           }
         },
         child: SingleChildScrollView(
@@ -146,6 +157,12 @@ class _PodHomeScreenState extends ConsumerState<PodHomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Daily Check-in prompt card (dismissible, shown if me_checked_in_today is false)
+              DailyCheckinCard(
+                podId: resolvedPodId,
+                partnerName: partner?.user.name,
+              ),
+
               // 1. Partner Info & Streak Badge Header Card
               Card(
                 elevation: 0,
@@ -207,51 +224,11 @@ class _PodHomeScreenState extends ConsumerState<PodHomeScreen> {
                             ),
                           ),
 
-                          // Streak Badge
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.md,
-                              vertical: AppSpacing.sm,
-                            ),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.primaryContainer,
-                              borderRadius: AppRadius.borderRadiusLg,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.local_fire_department_rounded,
-                                  color: theme.colorScheme.primary,
-                                  size: 22,
-                                ),
-                                const SizedBox(width: AppSpacing.xs),
-                                Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '${pod?.streak.currentStreak ?? 0} streak',
-                                      style: theme.textTheme.labelMedium
-                                          ?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                        color: theme.colorScheme
-                                            .onPrimaryContainer,
-                                      ),
-                                    ),
-                                    Text(
-                                      'Best: ${pod?.streak.bestStreak ?? 0}',
-                                      style: theme.textTheme.labelSmall
-                                          ?.copyWith(
-                                        color: theme.colorScheme
-                                            .onPrimaryContainer
-                                            .withValues(alpha: 0.8),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
+                          // Streak Badge (embedded widget, tapping routes to streak-detail)
+                          StreakBadge(
+                            podId: resolvedPodId,
+                            fallbackCurrentStreak: pod?.streak.currentStreak,
+                            fallbackBestStreak: pod?.streak.bestStreak,
                           ),
                         ],
                       ),

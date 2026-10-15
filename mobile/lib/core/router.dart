@@ -19,6 +19,9 @@ import '../features/pods/pod_settings_screen.dart';
 import '../features/todos/models/todo_model.dart';
 import '../features/todos/todo_detail_screen.dart';
 import '../features/todos/todo_list_screen.dart';
+import '../features/checkins/checkins_screen.dart';
+import '../features/checkins/streak_detail_screen.dart';
+import '../features/checkins/streak_recovery_screen.dart';
 
 /// String constants for all route names and paths.
 class AppRoutes {
@@ -299,17 +302,32 @@ GoRouter createRouter({
       GoRoute(
         name: AppRoutes.checkin,
         path: AppRoutes.checkinPath,
-        builder: (context, state) => const RouteStubScreen(routeName: AppRoutes.checkin),
+        builder: (context, state) {
+          final podId = state.extra as String? ??
+              state.uri.queryParameters['pod_id'] ??
+              state.uri.queryParameters['id'];
+          return CheckInsScreen(podId: podId);
+        },
       ),
       GoRoute(
         name: AppRoutes.streakDetail,
         path: AppRoutes.streakDetailPath,
-        builder: (context, state) => const RouteStubScreen(routeName: AppRoutes.streakDetail),
+        builder: (context, state) {
+          final podId = state.extra as String? ??
+              state.uri.queryParameters['pod_id'] ??
+              state.uri.queryParameters['id'];
+          return StreakDetailScreen(podId: podId);
+        },
       ),
       GoRoute(
         name: AppRoutes.streakRecovery,
         path: AppRoutes.streakRecoveryPath,
-        builder: (context, state) => const RouteStubScreen(routeName: AppRoutes.streakRecovery),
+        builder: (context, state) {
+          final podId = state.extra as String? ??
+              state.uri.queryParameters['pod_id'] ??
+              state.uri.queryParameters['id'];
+          return StreakRecoveryScreen(podId: podId);
+        },
       ),
       GoRoute(
         name: AppRoutes.profile,

@@ -20,6 +20,9 @@ import 'package:mobile/features/pods/pod_home_screen.dart';
 import 'package:mobile/features/pods/pod_settings_screen.dart';
 import 'package:mobile/features/todos/todo_detail_screen.dart';
 import 'package:mobile/features/todos/todo_list_screen.dart';
+import 'package:mobile/features/checkins/checkins_screen.dart';
+import 'package:mobile/features/checkins/streak_detail_screen.dart';
+import 'package:mobile/features/checkins/streak_recovery_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -233,6 +236,21 @@ void main() {
       await pumpRouter(tester);
       expect(find.byType(ChatScreen), findsOneWidget);
 
+      // 14. Checkins
+      testRouter.go(AppRoutes.checkinPath);
+      await pumpRouter(tester);
+      expect(find.byType(CheckInsScreen), findsOneWidget);
+
+      // 15. Streak Detail
+      testRouter.go(AppRoutes.streakDetailPath);
+      await pumpRouter(tester);
+      expect(find.byType(StreakDetailScreen), findsOneWidget);
+
+      // 16. Streak Recovery
+      testRouter.go(AppRoutes.streakRecoveryPath);
+      await pumpRouter(tester);
+      expect(find.byType(StreakRecoveryScreen), findsOneWidget);
+
       // Clean up widget tree
       await tester.pumpWidget(const SizedBox());
     });
@@ -243,9 +261,6 @@ void main() {
       await storage.saveToken('authenticated-token');
 
       final remainingRoutes = [
-        AppRoutes.checkinPath,
-        AppRoutes.streakDetailPath,
-        AppRoutes.streakRecoveryPath,
         AppRoutes.profilePath,
         AppRoutes.notificationSettingsPath,
         AppRoutes.blockedUsersPath,
@@ -255,7 +270,7 @@ void main() {
 
       final testRouter = createRouter(
         tokenStorage: storage,
-        initialLocation: AppRoutes.checkinPath,
+        initialLocation: AppRoutes.profilePath,
       );
 
       await tester.pumpWidget(buildTestApp(testRouter, storage: storage));
