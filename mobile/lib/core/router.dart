@@ -7,10 +7,14 @@ import 'theme/app_theme.dart';
 import '../features/auth/login_screen.dart';
 import '../features/auth/signup_screen.dart';
 import '../features/auth/splash_screen.dart';
+import '../features/matching/finding_match_screen.dart';
+import '../features/matching/match_found_screen.dart';
 import '../features/onboarding/goal_category_screen.dart';
 import '../features/onboarding/goal_detail_screen.dart';
 import '../features/onboarding/matching_prefs_screen.dart';
 import '../features/onboarding/profile_setup_screen.dart';
+import '../features/pods/pod_home_screen.dart';
+import '../features/pods/pod_settings_screen.dart';
 
 /// String constants for all route names and paths.
 class AppRoutes {
@@ -205,22 +209,37 @@ GoRouter createRouter({
       GoRoute(
         name: AppRoutes.findingMatch,
         path: AppRoutes.findingMatchPath,
-        builder: (context, state) => const RouteStubScreen(routeName: AppRoutes.findingMatch),
+        builder: (context, state) => const FindingMatchScreen(),
       ),
       GoRoute(
         name: AppRoutes.matchFound,
         path: AppRoutes.matchFoundPath,
-        builder: (context, state) => const RouteStubScreen(routeName: AppRoutes.matchFound),
+        builder: (context, state) {
+          final podId = state.extra as String? ??
+              state.uri.queryParameters['pod_id'] ??
+              state.uri.queryParameters['id'];
+          return MatchFoundScreen(podId: podId);
+        },
       ),
       GoRoute(
         name: AppRoutes.podHome,
         path: AppRoutes.podHomePath,
-        builder: (context, state) => const RouteStubScreen(routeName: AppRoutes.podHome),
+        builder: (context, state) {
+          final podId = state.extra as String? ??
+              state.uri.queryParameters['pod_id'] ??
+              state.uri.queryParameters['id'];
+          return PodHomeScreen(podId: podId);
+        },
       ),
       GoRoute(
         name: AppRoutes.podSettings,
         path: AppRoutes.podSettingsPath,
-        builder: (context, state) => const RouteStubScreen(routeName: AppRoutes.podSettings),
+        builder: (context, state) {
+          final podId = state.extra as String? ??
+              state.uri.queryParameters['pod_id'] ??
+              state.uri.queryParameters['id'];
+          return PodSettingsScreen(podId: podId);
+        },
       ),
       GoRoute(
         name: AppRoutes.todoList,

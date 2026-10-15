@@ -13,6 +13,7 @@ import 'package:mobile/features/auth/models/user_model.dart';
 import 'package:mobile/features/onboarding/goal_category_provider.dart';
 import 'package:mobile/features/onboarding/goal_category_screen.dart';
 import 'package:mobile/features/onboarding/goal_detail_screen.dart';
+import 'package:mobile/features/matching/finding_match_screen.dart';
 import 'package:mobile/features/onboarding/matching_prefs_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile/features/onboarding/profile_setup_screen.dart';
@@ -317,9 +318,14 @@ void main() {
       // Submit preferences
       await tester.ensureVisible(find.text('Find Partner Match'));
       await tester.tap(find.text('Find Partner Match'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.text(AppRoutes.findingMatch), findsAtLeastNWidgets(1));
+      expect(find.byType(FindingMatchScreen), findsOneWidget);
+
+      // Cleanly unmount widget tree to dispose timers and tickers
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
     });
   });
 }

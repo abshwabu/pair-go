@@ -5,6 +5,8 @@ import 'package:mobile/core/network/api_client.dart';
 import 'package:mobile/core/storage/token_storage.dart';
 import 'package:mobile/features/auth/models/user_model.dart';
 import 'package:mobile/features/goals/models/goal_model.dart';
+import 'package:mobile/features/matching/models/matching_request_model.dart';
+import 'package:mobile/features/pods/models/pod_model.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -105,6 +107,165 @@ void main() {
       final loginUser = UserModel.fromJson(loginRes.data['user']);
       expect(loginUser.id, user.id);
       expect(loginUser.email, testEmail);
+    });
+
+    test('Full matching to pod home, leave pod, and block partner flow', () async {
+      final uniqueSuffix = DateTime.now().millisecondsSinceEpoch;
+
+      // 1. Register User A
+      final userAStorage = TokenStorage();
+      final userAApi = ApiClient(
+        tokenStorage: userAStorage,
+        baseUrl: 'http://localhost:8085/api/v1',
+      );
+
+      final userAReg = await userAApi.post<Map<String, dynamic>>(
+        '/auth/register',
+        data: {
+          'name': 'User Alpha',
+          'email': 'alpha_$uniqueSuffix@pair.test',
+          'password': 'Password123!',
+          'timezone': 'UTC',
+        },
+      );
+      final tokenA = userAReg.data['token'] as String;
+      final userAId = (userAReg.data['user'] as Map<String, dynamic>)['id'] as String;
+      await userAStorage.saveToken(tokenA);
+
+      // Create Goal for User A
+      final goalARes = await userAApi.post<Map<String, dynamic>>(
+        '/goals',
+        data: {
+          'category': 'read',
+          'title': 'Read Sci-Fi Books',
+          'target_description': '1 chapter daily',
+          'pace': 'steady',
+        },
+      );
+      final goalA = GoalModel.fromJson(goalARes.data);
+
+      // User A submits match request
+      final matchARes = await userAApi.post<Map<String, dynamic>>(
+        '/matching/request',
+        data: {
+          'goal_id': goalA.id,
+          'timezone_tolerance_hours': 5,
+        },
+      );
+      final reqA = MatchingRequestModel.fromJson(matchARes.data);
+      expect(reqA.status, 'open');
+
+      // Test Cancel Match Request and Re-creation
+      await userAApi.delete<Map<String, dynamic>>('/matching/request/${reqA.id}');
+      final checkCancelRes = await userAApi.get<Map<String, dynamic>>('/matching/request/${reqA.id}');
+      final cancelledReq = MatchingRequestModel.fromJson(checkCancelRes.data);
+      expect(cancelledReq.status, 'cancelled');
+
+      // Re-create match request for User A
+      final newMatchARes = await userAApi.post<Map<String, dynamic>>(
+        '/matching/request',
+        data: {
+          'goal_id': goalA.id,
+          'timezone_tolerance_hours': 5,
+        },
+      );
+      final newReqA = MatchingRequestModel.fromJson(newMatchARes.data);
+      expect(newReqA.status, 'open');
+
+      // 2. Register User B
+      final userBStorage = TokenStorage();
+      final userBApi = ApiClient(
+        tokenStorage: userBStorage,
+        baseUrl: 'http://localhost:8085/api/v1',
+      );
+
+      final userBReg = await userBApi.post<Map<String, dynamic>>(
+        '/auth/register',
+        data: {
+          'name': 'User Beta',
+          'email': 'beta_$uniqueSuffix@pair.test',
+          'password': 'Password123!',
+          'timezone': 'UTC',
+        },
+      );
+      final tokenB = userBReg.data['token'] as String;
+      final userBId = (userBReg.data['user'] as Map<String, dynamic>)['id'] as String;
+      await userBStorage.saveToken(tokenB);
+
+      // Create Goal for User B
+      final goalBRes = await userBApi.post<Map<String, dynamic>>(
+        '/goals',
+        data: {
+          'category': 'read',
+          'title': 'Read Dune Chronicles',
+          'target_description': 'Finish by end of month',
+          'pace': 'steady',
+        },
+      );
+      final goalB = GoalModel.fromJson(goalBRes.data);
+
+      // User B submits match request (matches immediately with User A!)
+      final matchBRes = await userBApi.post<Map<String, dynamic>>(
+        '/matching/request',
+        data: {
+          'goal_id': goalB.id,
+          'timezone_tolerance_hours': 5,
+        },
+      );
+      final reqB = MatchingRequestModel.fromJson(matchBRes.data);
+
+      // Wait a moment for worker to complete transaction if asynchronous
+      String? matchedPodId = reqB.podId;
+      if (matchedPodId == null || matchedPodId.isEmpty) {
+        for (int i = 0; i < 10; i++) {
+          await Future.delayed(const Duration(milliseconds: 300));
+          final poll = await userBApi.get<Map<String, dynamic>>('/matching/request/${reqB.id}');
+          final pollReq = MatchingRequestModel.fromJson(poll.data);
+          if (pollReq.isMatched) {
+            matchedPodId = pollReq.podId;
+            break;
+          }
+        }
+      }
+
+      expect(matchedPodId, isNotNull);
+      expect(matchedPodId!.isNotEmpty, isTrue);
+
+      // 3. User A checks request status -> matched!
+      final pollA = await userAApi.get<Map<String, dynamic>>('/matching/request/${newReqA.id}');
+      final pollReqA = MatchingRequestModel.fromJson(pollA.data);
+      expect(pollReqA.status, 'matched');
+      expect(pollReqA.podId, matchedPodId);
+
+      // 4. User A fetches pod detail via GET /pods/{id}
+      final podRes = await userAApi.get<Map<String, dynamic>>('/pods/$matchedPodId');
+      final podDetail = PodDetail.fromJson(podRes.data);
+      expect(podDetail.id, matchedPodId);
+      expect(podDetail.goalCategory, 'read');
+      expect(podDetail.status, 'active');
+      expect(podDetail.members.length, 2);
+
+      final partner = podDetail.partner(userAId);
+      expect(partner, isNotNull);
+      expect(partner!.user.id, userBId);
+      expect(partner.user.name, 'User Beta');
+      expect(partner.goal.title, 'Read Dune Chronicles');
+
+      // 5. User A leaves pod via POST /pods/{id}/leave
+      final leaveRes = await userAApi.post<Map<String, dynamic>>('/pods/$matchedPodId/leave');
+      expect(leaveRes.data['message'], 'left pod successfully');
+
+      // User A no longer has active pods
+      final userAPods = await userAApi.get<dynamic>('/pods');
+      expect((userAPods.data as List).isEmpty, isTrue);
+
+      // 6. User B blocks User A via POST /blocks
+      final blockRes = await userBApi.post<Map<String, dynamic>>(
+        '/blocks',
+        data: {'blocked_user_id': userAId},
+      );
+      expect(blockRes.data['blocked_user_id'], userAId);
+      expect(blockRes.data['user_id'], userBId);
     });
   });
 }

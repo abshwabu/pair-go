@@ -11,6 +11,7 @@ import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/core/widgets/error_banner.dart';
 import 'package:mobile/features/auth/login_screen.dart';
 import 'package:mobile/features/onboarding/profile_setup_screen.dart';
+import 'package:mobile/features/pods/pod_home_screen.dart';
 
 import 'package:flutter/services.dart';
 
@@ -199,7 +200,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text(AppRoutes.podHome), findsAtLeastNWidgets(1));
+      expect(find.byType(PodHomeScreen), findsOneWidget);
     });
 
     testWidgets('Routes to /login and clears token when /auth/me fails',

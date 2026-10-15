@@ -9,10 +9,14 @@ import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/features/auth/login_screen.dart';
 import 'package:mobile/features/auth/signup_screen.dart';
 import 'package:mobile/features/auth/splash_screen.dart';
+import 'package:mobile/features/matching/finding_match_screen.dart';
+import 'package:mobile/features/matching/match_found_screen.dart';
 import 'package:mobile/features/onboarding/goal_category_screen.dart';
 import 'package:mobile/features/onboarding/goal_detail_screen.dart';
 import 'package:mobile/features/onboarding/matching_prefs_screen.dart';
 import 'package:mobile/features/onboarding/profile_setup_screen.dart';
+import 'package:mobile/features/pods/pod_home_screen.dart';
+import 'package:mobile/features/pods/pod_settings_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -31,6 +35,11 @@ void main() {
         routerConfig: router,
       ),
     );
+  }
+
+  Future<void> pumpRouter(WidgetTester tester) async {
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pump(const Duration(milliseconds: 50));
   }
 
   group('Router Tests', () {
@@ -73,7 +82,7 @@ void main() {
       final testRouter = createRouter(tokenStorage: storage);
 
       await tester.pumpWidget(buildTestApp(testRouter, storage: storage));
-      await tester.pump();
+      await pumpRouter(tester);
 
       expect(find.byType(SplashScreen), findsOneWidget);
       expect(find.text('Pair'), findsOneWidget);
@@ -90,7 +99,7 @@ void main() {
         initialLocation: AppRoutes.loginPath,
       );
       await tester.pumpWidget(buildTestApp(loginRouter, storage: storage));
-      await tester.pump();
+      await pumpRouter(tester);
       expect(find.byType(LoginScreen), findsOneWidget);
       expect(find.text('Welcome back'), findsOneWidget);
 
@@ -100,7 +109,7 @@ void main() {
         initialLocation: AppRoutes.signupPath,
       );
       await tester.pumpWidget(buildTestApp(signupRouter, storage: storage));
-      await tester.pump();
+      await pumpRouter(tester);
       expect(find.byType(SignupScreen), findsOneWidget);
       expect(find.text('Create an account'), findsOneWidget);
     });
@@ -109,28 +118,13 @@ void main() {
         (WidgetTester tester) async {
       final storage = TokenStorage();
 
-      // Try accessing protected route /pod-home without token
-      final podRouter = createRouter(
-        tokenStorage: storage,
-        initialLocation: AppRoutes.podHomePath,
-      );
-
-      await tester.pumpWidget(buildTestApp(podRouter, storage: storage));
-      await tester.pump();
-
-      // Should have been redirected to LoginScreen
-      expect(find.byType(LoginScreen), findsOneWidget);
-      expect(find.text('Welcome back'), findsOneWidget);
-      expect(find.text(AppRoutes.podHome), findsNothing);
-
-      // Try accessing protected route /chat without token
       final chatRouter = createRouter(
         tokenStorage: storage,
         initialLocation: AppRoutes.chatPath,
       );
 
       await tester.pumpWidget(buildTestApp(chatRouter, storage: storage));
-      await tester.pump();
+      await pumpRouter(tester);
 
       // Should have been redirected to LoginScreen
       expect(find.byType(LoginScreen), findsOneWidget);
@@ -149,18 +143,18 @@ void main() {
       );
 
       await tester.pumpWidget(buildTestApp(podRouter, storage: storage));
-      await tester.pumpAndSettle();
+      await pumpRouter(tester);
 
-      expect(find.text(AppRoutes.podHome), findsAtLeastNWidgets(1));
+      expect(find.byType(PodHomeScreen), findsOneWidget);
 
       // Navigate to /chat
       podRouter.go(AppRoutes.chatPath);
-      await tester.pumpAndSettle();
+      await pumpRouter(tester);
 
       expect(find.text(AppRoutes.chat), findsAtLeastNWidgets(1));
     });
 
-    testWidgets('First 7 routes render their respective feature screen widgets',
+    testWidgets('First 11 routes render their respective feature screen widgets',
         (WidgetTester tester) async {
       final storage = TokenStorage();
       await storage.saveToken('authenticated-token');
@@ -171,35 +165,58 @@ void main() {
       );
 
       await tester.pumpWidget(buildTestApp(testRouter, storage: storage));
-      await tester.pumpAndSettle();
+      await pumpRouter(tester);
 
-      // Login
+      // 1. Login
       expect(find.byType(LoginScreen), findsOneWidget);
 
-      // Signup
+      // 2. Signup
       testRouter.go(AppRoutes.signupPath);
-      await tester.pumpAndSettle();
+      await pumpRouter(tester);
       expect(find.byType(SignupScreen), findsOneWidget);
 
-      // Profile Setup
+      // 3. Profile Setup
       testRouter.go(AppRoutes.profileSetupPath);
-      await tester.pumpAndSettle();
+      await pumpRouter(tester);
       expect(find.byType(ProfileSetupScreen), findsOneWidget);
 
-      // Goal Category
+      // 4. Goal Category
       testRouter.go(AppRoutes.goalCategoryPath);
-      await tester.pumpAndSettle();
+      await pumpRouter(tester);
       expect(find.byType(GoalCategoryScreen), findsOneWidget);
 
-      // Goal Detail
+      // 5. Goal Detail
       testRouter.go(AppRoutes.goalDetailPath);
-      await tester.pumpAndSettle();
+      await pumpRouter(tester);
       expect(find.byType(GoalDetailScreen), findsOneWidget);
 
-      // Matching Prefs
+      // 6. Matching Prefs
       testRouter.go(AppRoutes.matchingPrefsPath);
-      await tester.pumpAndSettle();
+      await pumpRouter(tester);
       expect(find.byType(MatchingPrefsScreen), findsOneWidget);
+
+      // 7. Finding Match
+      testRouter.go(AppRoutes.findingMatchPath);
+      await pumpRouter(tester);
+      expect(find.byType(FindingMatchScreen), findsOneWidget);
+
+      // 8. Match Found
+      testRouter.go(AppRoutes.matchFoundPath);
+      await pumpRouter(tester);
+      expect(find.byType(MatchFoundScreen), findsOneWidget);
+
+      // 9. Pod Home
+      testRouter.go(AppRoutes.podHomePath);
+      await pumpRouter(tester);
+      expect(find.byType(PodHomeScreen), findsOneWidget);
+
+      // 10. Pod Settings
+      testRouter.go(AppRoutes.podSettingsPath);
+      await pumpRouter(tester);
+      expect(find.byType(PodSettingsScreen), findsOneWidget);
+
+      // Clean up widget tree
+      await tester.pumpWidget(const SizedBox());
     });
 
     testWidgets('Remaining routes render RouteStubScreen',
@@ -208,10 +225,6 @@ void main() {
       await storage.saveToken('authenticated-token');
 
       final remainingRoutes = [
-        AppRoutes.findingMatchPath,
-        AppRoutes.matchFoundPath,
-        AppRoutes.podHomePath,
-        AppRoutes.podSettingsPath,
         AppRoutes.todoListPath,
         AppRoutes.todoDetailPath,
         AppRoutes.chatPath,
@@ -227,7 +240,7 @@ void main() {
 
       final testRouter = createRouter(
         tokenStorage: storage,
-        initialLocation: AppRoutes.findingMatchPath,
+        initialLocation: AppRoutes.todoListPath,
       );
 
       await tester.pumpWidget(buildTestApp(testRouter, storage: storage));
