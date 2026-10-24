@@ -413,3 +413,147 @@ func TestProfile_UploadAvatar_OversizedFile(t *testing.T) {
 		t.Errorf("expected 5MB / FILE_TOO_LARGE error message, got code=%s message=%s", resp.Error.Code, resp.Error.Message)
 	}
 }
+
+func TestProfile_ChangePassword(t *testing.T) {
+	router, _, database, token := setupProfileTestApp(t)
+	defer database.Close()
+
+	// 1. Unauthenticated request
+	reqUnauth := httptest.NewRequest(http.MethodPatch, "/api/v1/profile/password", strings.NewReader(`{"current_password":"initialpassword123","new_password":"NewStrongPassword456!"}`))
+	reqUnauth.Header.Set("Content-Type", "application/json")
+	recUnauth := httptest.NewRecorder()
+	router.ServeHTTP(recUnauth, reqUnauth)
+	if recUnauth.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for unauthenticated request, got %d", recUnauth.Code)
+	}
+
+	// 2. Incorrect current password
+	wrongReq := httptest.NewRequest(http.MethodPatch, "/api/v1/profile/password", strings.NewReader(`{"current_password":"wrongpassword","new_password":"NewStrongPassword456!"}`))
+	wrongReq.Header.Set("Authorization", "Bearer "+token)
+	wrongReq.Header.Set("Content-Type", "application/json")
+	wrongRec := httptest.NewRecorder()
+	router.ServeHTTP(wrongRec, wrongReq)
+	if wrongRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for wrong current password, got %d: %s", wrongRec.Code, wrongRec.Body.String())
+	}
+
+	// 3. Short new password (< 8 characters)
+	shortReq := httptest.NewRequest(http.MethodPatch, "/api/v1/profile/password", strings.NewReader(`{"current_password":"initialpassword123","new_password":"short"}`))
+	shortReq.Header.Set("Authorization", "Bearer "+token)
+	shortReq.Header.Set("Content-Type", "application/json")
+	shortRec := httptest.NewRecorder()
+	router.ServeHTTP(shortRec, shortReq)
+	if shortRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for short new password, got %d: %s", shortRec.Code, shortRec.Body.String())
+	}
+
+	// 4. Create a second session (second token) to test token revocation
+	loginReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(`{"email":"user@example.com","password":"initialpassword123"}`))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginRec := httptest.NewRecorder()
+	router.ServeHTTP(loginRec, loginReq)
+	if loginRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 on login, got %d", loginRec.Code)
+	}
+	var loginResp httpapi.Response
+	_ = json.Unmarshal(loginRec.Body.Bytes(), &loginResp)
+	token2 := loginResp.Data.(map[string]any)["token"].(string)
+
+	// 5. Change password using token2
+	changeReq := httptest.NewRequest(http.MethodPatch, "/api/v1/profile/password", strings.NewReader(`{"current_password":"initialpassword123","new_password":"NewStrongPassword456!"}`))
+	changeReq.Header.Set("Authorization", "Bearer "+token2)
+	changeReq.Header.Set("Content-Type", "application/json")
+	changeRec := httptest.NewRecorder()
+	router.ServeHTTP(changeRec, changeReq)
+	if changeRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 on successful password change, got %d: %s", changeRec.Code, changeRec.Body.String())
+	}
+
+	// 6. Old token (token) should now be revoked (401)
+	checkOldReq := httptest.NewRequest(http.MethodGet, "/api/v1/profile", nil)
+	checkOldReq.Header.Set("Authorization", "Bearer "+token)
+	checkOldRec := httptest.NewRecorder()
+	router.ServeHTTP(checkOldRec, checkOldReq)
+	if checkOldRec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for revoked token, got %d", checkOldRec.Code)
+	}
+
+	// 7. Token2 should still be valid (200)
+	checkNewReq := httptest.NewRequest(http.MethodGet, "/api/v1/profile", nil)
+	checkNewReq.Header.Set("Authorization", "Bearer "+token2)
+	checkNewRec := httptest.NewRecorder()
+	router.ServeHTTP(checkNewRec, checkNewReq)
+	if checkNewRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for active token, got %d", checkNewRec.Code)
+	}
+
+	// 8. Login with old password fails
+	failLoginReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(`{"email":"user@example.com","password":"initialpassword123"}`))
+	failLoginReq.Header.Set("Content-Type", "application/json")
+	failLoginRec := httptest.NewRecorder()
+	router.ServeHTTP(failLoginRec, failLoginReq)
+	if failLoginRec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 with old password, got %d", failLoginRec.Code)
+	}
+
+	// 9. Login with new password succeeds
+	succLoginReq := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(`{"email":"user@example.com","password":"NewStrongPassword456!"}`))
+	succLoginReq.Header.Set("Content-Type", "application/json")
+	succLoginRec := httptest.NewRecorder()
+	router.ServeHTTP(succLoginRec, succLoginReq)
+	if succLoginRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 with new password, got %d: %s", succLoginRec.Code, succLoginRec.Body.String())
+	}
+}
+
+func TestProfile_DeleteAccount(t *testing.T) {
+	router, _, database, token := setupProfileTestApp(t)
+	defer database.Close()
+
+	// 1. Unauthenticated request -> 401
+	unauthReq := httptest.NewRequest(http.MethodDelete, "/api/v1/profile", nil)
+	unauthRec := httptest.NewRecorder()
+	router.ServeHTTP(unauthRec, unauthReq)
+	if unauthRec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for unauthenticated delete, got %d", unauthRec.Code)
+	}
+
+	// 2. Delete account with authenticated token
+	delReq := httptest.NewRequest(http.MethodDelete, "/api/v1/profile", nil)
+	delReq.Header.Set("Authorization", "Bearer "+token)
+	delRec := httptest.NewRecorder()
+	router.ServeHTTP(delRec, delReq)
+	if delRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for delete account, got %d: %s", delRec.Code, delRec.Body.String())
+	}
+
+	// 3. User token should be revoked (subsequent requests fail with 401)
+	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/profile", nil)
+	getReq.Header.Set("Authorization", "Bearer "+token)
+	getRec := httptest.NewRecorder()
+	router.ServeHTTP(getRec, getReq)
+	if getRec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 after account deletion, got %d", getRec.Code)
+	}
+
+	// 4. Verify user record in database is anonymized and soft-deleted
+	var name, email string
+	var deletedAt, avatarURL, fcmToken *string
+	err := database.Read.QueryRow(`SELECT name, email, deleted_at, avatar_url, fcm_token FROM users WHERE email LIKE 'deleted_%';`).
+		Scan(&name, &email, &deletedAt, &avatarURL, &fcmToken)
+	if err != nil {
+		t.Fatalf("failed to query anonymized user: %v", err)
+	}
+	if name != "Deleted User" {
+		t.Errorf("expected name 'Deleted User', got %q", name)
+	}
+	if deletedAt == nil {
+		t.Errorf("expected deleted_at to be non-nil")
+	}
+	if avatarURL != nil {
+		t.Errorf("expected avatar_url to be nil, got %v", *avatarURL)
+	}
+	if fcmToken != nil {
+		t.Errorf("expected fcm_token to be nil, got %v", *fcmToken)
+	}
+}

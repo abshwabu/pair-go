@@ -41,6 +41,9 @@ dependencies:
   flutter_secure_storage: ^10.3.4
   image_picker: ^1.2.2
   flutter_timezone: ^5.1.1
+  shared_preferences: ^2.5.5
+  firebase_messaging: ^17.0.1
+  firebase_core: ^5.1.0
 
 dev_dependencies:
   flutter_test:

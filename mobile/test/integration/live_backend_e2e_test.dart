@@ -124,11 +124,12 @@ void main() {
         baseUrl: 'http://localhost:8085/api/v1',
       );
 
+      final emailA = 'alpha_$uniqueSuffix@pair.test';
       final userAReg = await userAApi.post<Map<String, dynamic>>(
         '/auth/register',
         data: {
           'name': 'User Alpha',
-          'email': 'alpha_$uniqueSuffix@pair.test',
+          'email': emailA,
           'password': 'Password123!',
           'timezone': 'UTC',
         },
@@ -136,6 +137,10 @@ void main() {
       final tokenA = userAReg.data['token'] as String;
       final userAId = (userAReg.data['user'] as Map<String, dynamic>)['id'] as String;
       await userAStorage.saveToken(tokenA);
+
+      // Set unique language so A and B isolate from other test data
+      final uniqueLang = 'lang_$uniqueSuffix';
+      await userAApi.patch<Map<String, dynamic>>('/profile', data: {'language': uniqueLang});
 
       // Create Goal for User A
       final goalARes = await userAApi.post<Map<String, dynamic>>(
@@ -196,6 +201,7 @@ void main() {
       final tokenB = userBReg.data['token'] as String;
       final userBId = (userBReg.data['user'] as Map<String, dynamic>)['id'] as String;
       await userBStorage.saveToken(tokenB);
+      await userBApi.patch<Map<String, dynamic>>('/profile', data: {'language': uniqueLang});
 
       // Create Goal for User B
       final goalBRes = await userBApi.post<Map<String, dynamic>>(
@@ -539,6 +545,171 @@ void main() {
       );
       expect(blockRes.data['blocked_user_id'], userAId);
       expect(blockRes.data['user_id'], userBId);
+
+      // 7. User B lists blocks via GET /blocks
+      final blocksListRes = await userBApi.get<dynamic>('/blocks');
+      final blocksList = blocksListRes.data as List;
+      expect(blocksList.length, 1);
+      final blockItem = blocksList.first as Map<String, dynamic>;
+      expect(blockItem['blocked_user_id'], userAId);
+      expect(blockItem['name'], 'User Alpha');
+      final blockId = blockItem['id'] as String;
+
+      // 8. User B unblocks User A via DELETE /blocks/{id}
+      final unblockRes = await userBApi.delete<Map<String, dynamic>>('/blocks/$blockId');
+      expect(unblockRes.data['message'], 'unblocked successfully');
+
+      // Verify blocks list is now empty
+      final emptyBlocksRes = await userBApi.get<dynamic>('/blocks');
+      expect((emptyBlocksRes.data as List).isEmpty, isTrue);
+
+      // 9. User B blocks User A again
+      final blockRes2 = await userBApi.post<Map<String, dynamic>>(
+        '/blocks',
+        data: {'blocked_user_id': userAId},
+      );
+      expect(blockRes2.data['blocked_user_id'], userAId);
+
+      // 10. Verify blocked users are never matched together
+      final goalA2Res = await userAApi.post<Map<String, dynamic>>(
+        '/goals',
+        data: {
+          'category': 'fitness',
+          'title': 'Blocked Pair Test Goal A',
+          'target_description': 'Run daily',
+          'pace': 'steady',
+        },
+      );
+      final goalA2 = GoalModel.fromJson(goalA2Res.data);
+
+      final matchA2Res = await userAApi.post<Map<String, dynamic>>(
+        '/matching/request',
+        data: {
+          'goal_id': goalA2.id,
+          'timezone_tolerance_hours': 10,
+        },
+      );
+      final reqA2 = MatchingRequestModel.fromJson(matchA2Res.data);
+
+      // User B leaves active pod if any, creates matching fitness goal
+      final userBPods = await userBApi.get<dynamic>('/pods');
+      if ((userBPods.data as List).isNotEmpty) {
+        await userBApi.post<Map<String, dynamic>>('/pods/$matchedPodId/leave');
+      }
+
+      final goalB2Res = await userBApi.post<Map<String, dynamic>>(
+        '/goals',
+        data: {
+          'category': 'fitness',
+          'title': 'Blocked Pair Test Goal B',
+          'target_description': 'Run daily too',
+          'pace': 'steady',
+        },
+      );
+      final goalB2 = GoalModel.fromJson(goalB2Res.data);
+
+      final matchB2Res = await userBApi.post<Map<String, dynamic>>(
+        '/matching/request',
+        data: {
+          'goal_id': goalB2.id,
+          'timezone_tolerance_hours': 10,
+        },
+      );
+      final reqB2 = MatchingRequestModel.fromJson(matchB2Res.data);
+
+      // Give worker a moment to process matching loop
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      final pollA2 = await userAApi.get<Map<String, dynamic>>('/matching/request/${reqA2.id}');
+      final pollB2 = await userBApi.get<Map<String, dynamic>>('/matching/request/${reqB2.id}');
+      // Neither request should match to each other!
+      expect(MatchingRequestModel.fromJson(pollA2.data).podId, isNull);
+      expect(MatchingRequestModel.fromJson(pollB2.data).podId, isNull);
+
+      // 11. User A registers FCM token via PATCH /profile/fcm-token
+      final fcmRes = await userAApi.patch<Map<String, dynamic>>(
+        '/profile/fcm-token',
+        data: {'fcm_token': 'fcm_sample_token_xyz_987'},
+      );
+      expect(fcmRes.data['id'], userAId);
+      expect(fcmRes.data['fcm_token'], 'fcm_sample_token_xyz_987');
+
+      // 12. User A reports User B via POST /reports
+      final reportRes = await userAApi.post<Map<String, dynamic>>(
+        '/reports',
+        data: {
+          'reported_user_id': userBId,
+          'reason': 'Violated accountability commitments and abusive communications.',
+        },
+      );
+      expect(reportRes.data['status'], 'open');
+
+      // 13. User A changes password via PATCH /profile/password
+      const newPassword = 'NewSecretPassword456!';
+      final changePwRes = await userAApi.patch<Map<String, dynamic>>(
+        '/profile/password',
+        data: {
+          'current_password': 'Password123!',
+          'new_password': newPassword,
+        },
+      );
+      expect(changePwRes.data['message'], 'password updated successfully');
+
+      // Verify logging in with old password fails
+      try {
+        await apiClient.post<Map<String, dynamic>>(
+          '/auth/login',
+          data: {
+            'email': emailA,
+            'password': 'Password123!',
+          },
+        );
+        fail('Expected 401 Unauthorized with old password');
+      } on ApiException catch (e) {
+        expect(e.statusCode, 401);
+      }
+
+      // Verify logging in with new password succeeds
+      final loginNewRes = await apiClient.post<Map<String, dynamic>>(
+        '/auth/login',
+        data: {
+          'email': emailA,
+          'password': newPassword,
+        },
+      );
+      expect(loginNewRes.data['token'], isNotNull);
+      final freshTokenA = loginNewRes.data['token'] as String;
+      expect(freshTokenA.isNotEmpty, isTrue);
+
+      final freshStorageA = TokenStorage();
+      await freshStorageA.saveToken(freshTokenA);
+      final freshUserAApi = ApiClient(tokenStorage: freshStorageA, baseUrl: 'http://localhost:8085/api/v1');
+
+      // 14. User A deletes account via DELETE /profile
+      final deleteAccRes = await freshUserAApi.delete<Map<String, dynamic>>('/profile');
+      expect(deleteAccRes.data['message'], 'account deleted successfully');
+
+      // Subsequent authenticated requests with freshTokenA fail (token deleted/revoked)
+      try {
+        await freshUserAApi.get<Map<String, dynamic>>('/profile');
+        fail('Expected 401 Unauthorized after account deletion');
+      } on ApiException catch (e) {
+        expect(e.statusCode, 401);
+      }
+
+      // Login attempts for deleted account also fail
+      try {
+        await apiClient.post<Map<String, dynamic>>(
+          '/auth/login',
+          data: {
+            'email': emailA,
+            'password': newPassword,
+          },
+        );
+        fail('Expected 401 Unauthorized for deleted account');
+      } on ApiException catch (e) {
+        expect(e.statusCode, 401);
+      }
     });
   });
 }

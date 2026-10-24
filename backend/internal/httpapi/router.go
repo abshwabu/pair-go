@@ -61,10 +61,20 @@ func NewRouterWithWorker(cfg *config.Config, database *db.DB, storageService sto
 	authHandler := NewAuthHandler(authRepo, usersRepo)
 	authMW := AuthMiddleware(authRepo, usersRepo)
 
+	podsRepo := pods.NewRepository(database.Write, database.Read)
+	podsHandler := pods.NewHandler(podsRepo)
+
+	var chatHub *chat.Hub
+	if len(chatHubs) > 0 && chatHubs[0] != nil {
+		chatHub = chatHubs[0]
+	} else {
+		chatHub = chat.NewHub()
+	}
+
 	if storageService == nil {
 		storageService = storage.NewFakeStorage(cfg.S3PublicBaseURL)
 	}
-	profileHandler := NewProfileHandler(usersRepo, storageService)
+	profileHandler := NewProfileHandler(usersRepo, authRepo, podsRepo, chatHub, database.Write, storageService)
 
 	goalsRepo := goals.NewRepository(database.Write, database.Read)
 	goalsHandler := goals.NewHandler(goalsRepo)
@@ -75,18 +85,9 @@ func NewRouterWithWorker(cfg *config.Config, database *db.DB, storageService sto
 	}
 	matchingHandler := matching.NewHandler(matchingRepo, goalsRepo, worker)
 
-	podsRepo := pods.NewRepository(database.Write, database.Read)
-	podsHandler := pods.NewHandler(podsRepo)
-
 	todosRepo := todos.NewRepository(database.Write, database.Read)
 	todosHandler := todos.NewHandler(todosRepo)
 
-	var chatHub *chat.Hub
-	if len(chatHubs) > 0 && chatHubs[0] != nil {
-		chatHub = chatHubs[0]
-	} else {
-		chatHub = chat.NewHub()
-	}
 	chatRepo := chat.NewRepository(database.Write, database.Read)
 	chatHandler := chat.NewHandler(chatRepo, chatHub)
 
@@ -148,6 +149,8 @@ func NewRouterWithWorker(cfg *config.Config, database *db.DB, storageService sto
 			r.Use(authMW)
 			r.Get("/", profileHandler.GetProfile)
 			r.Patch("/", profileHandler.UpdateProfile)
+			r.Patch("/password", profileHandler.ChangePassword)
+			r.Delete("/", profileHandler.DeleteAccount)
 			r.Patch("/fcm-token", profileHandler.UpdateFCMToken)
 			r.Post("/avatar", profileHandler.UploadAvatar)
 		})

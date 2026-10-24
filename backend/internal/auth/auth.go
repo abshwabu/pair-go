@@ -194,6 +194,32 @@ func (r *Repository) DeleteByHash(ctx context.Context, tokenHash string) error {
 	return nil
 }
 
+// DeleteAllExcept deletes all auth tokens for a user except the specified token hash.
+func (r *Repository) DeleteAllExcept(ctx context.Context, userID, exceptTokenHash string) error {
+	query := `
+		DELETE FROM auth_tokens
+		WHERE user_id = ? AND token_hash != ?;
+	`
+	_, err := r.writeDB.ExecContext(ctx, query, userID, exceptTokenHash)
+	if err != nil {
+		return fmt.Errorf("failed to delete other tokens: %w", err)
+	}
+	return nil
+}
+
+// DeleteAllForUserTx deletes all auth tokens for a user within an existing transaction.
+func (r *Repository) DeleteAllForUserTx(ctx context.Context, tx *sql.Tx, userID string) error {
+	query := `
+		DELETE FROM auth_tokens
+		WHERE user_id = ?;
+	`
+	_, err := tx.ExecContext(ctx, query, userID)
+	if err != nil {
+		return fmt.Errorf("failed to delete auth tokens in tx: %w", err)
+	}
+	return nil
+}
+
 // HashPassword hashes a plaintext password using bcrypt.
 func HashPassword(password string) (string, error) {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)

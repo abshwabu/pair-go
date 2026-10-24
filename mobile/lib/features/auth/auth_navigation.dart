@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/network/api_client.dart';
+import '../../core/network/fcm_service.dart';
 import '../../core/router.dart';
 import '../../core/storage/token_storage.dart';
 import 'models/user_model.dart';
@@ -10,12 +11,14 @@ import 'models/user_model.dart';
 /// - Routes to pod-home if an active pod exists
 /// - Routes to goal-category if no active pod exists
 /// - Wipes token and routes to login if absent or invalid
+/// - Registers FCM token on successful authentication
 Future<void> navigatePostAuth({
   required ApiClient apiClient,
   required TokenStorage tokenStorage,
   required BuildContext context,
   void Function(UserModel user)? onAuthenticated,
   VoidCallback? onLogout,
+  FcmService? fcmService,
 }) async {
   final hasToken = await tokenStorage.hasToken();
   if (!hasToken) {
@@ -31,7 +34,10 @@ Future<void> navigatePostAuth({
     final user = UserModel.fromJson(meRes.data);
     onAuthenticated?.call(user);
 
-    // 2. Check active pods via /pods
+    // 2. Wire FCM token registration on app start after login
+    (fcmService ?? FcmService()).registerFcmToken(apiClient: apiClient);
+
+    // 3. Check active pods via /pods
     final podsRes = await apiClient.get<dynamic>('/pods');
     final pods = podsRes.data;
     final hasActivePod = pods is List && pods.isNotEmpty;
@@ -44,6 +50,9 @@ Future<void> navigatePostAuth({
       }
     }
   } catch (_) {
+    try {
+      await apiClient.post<dynamic>('/auth/logout');
+    } catch (_) {}
     await tokenStorage.deleteToken();
     onLogout?.call();
     if (context.mounted) {

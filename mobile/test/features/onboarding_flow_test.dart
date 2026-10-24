@@ -130,6 +130,8 @@ void main() {
           find.widgetWithText(TextFormField, 'Display Name'), 'Updated Name');
 
       // Tap submit
+      await tester.ensureVisible(find.text('Continue to Goals'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Continue to Goals'));
       await tester.pumpAndSettle();
 

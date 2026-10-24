@@ -23,6 +23,11 @@ import 'package:mobile/features/todos/todo_list_screen.dart';
 import 'package:mobile/features/checkins/checkins_screen.dart';
 import 'package:mobile/features/checkins/streak_detail_screen.dart';
 import 'package:mobile/features/checkins/streak_recovery_screen.dart';
+import 'package:mobile/features/account/account_settings_screen.dart';
+import 'package:mobile/features/account/blocked_users_screen.dart';
+import 'package:mobile/features/account/notification_settings_screen.dart';
+import 'package:mobile/features/account/profile_screen.dart';
+import 'package:mobile/features/account/report_form_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -255,18 +260,10 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     });
 
-    testWidgets('Remaining routes render RouteStubScreen',
+    testWidgets('Account routes render their respective feature screen widgets',
         (WidgetTester tester) async {
       final storage = TokenStorage();
       await storage.saveToken('authenticated-token');
-
-      final remainingRoutes = [
-        AppRoutes.profilePath,
-        AppRoutes.notificationSettingsPath,
-        AppRoutes.blockedUsersPath,
-        AppRoutes.reportFormPath,
-        AppRoutes.accountSettingsPath,
-      ];
 
       final testRouter = createRouter(
         tokenStorage: storage,
@@ -274,13 +271,24 @@ void main() {
       );
 
       await tester.pumpWidget(buildTestApp(testRouter, storage: storage));
-      await tester.pump(const Duration(milliseconds: 100));
+      await pumpRouter(tester);
+      expect(find.byType(ProfileScreen), findsOneWidget);
 
-      for (final path in remainingRoutes) {
-        testRouter.go(path);
-        await tester.pump(const Duration(milliseconds: 100));
-        expect(find.byType(RouteStubScreen), findsAtLeastNWidgets(1));
-      }
+      testRouter.go(AppRoutes.notificationSettingsPath);
+      await pumpRouter(tester);
+      expect(find.byType(NotificationSettingsScreen), findsOneWidget);
+
+      testRouter.go(AppRoutes.blockedUsersPath);
+      await pumpRouter(tester);
+      expect(find.byType(BlockedUsersScreen), findsOneWidget);
+
+      testRouter.go(AppRoutes.reportFormPath);
+      await pumpRouter(tester);
+      expect(find.byType(ReportFormScreen), findsOneWidget);
+
+      testRouter.go(AppRoutes.accountSettingsPath);
+      await pumpRouter(tester);
+      expect(find.byType(AccountSettingsScreen), findsOneWidget);
     });
   });
 }

@@ -13,6 +13,7 @@ import '../auth/models/user_model.dart';
 class ProfileSetupState {
   final String name;
   final String timezone;
+  final String language;
   final XFile? avatarFile;
   final String? existingAvatarUrl;
   final bool isLoading;
@@ -22,6 +23,7 @@ class ProfileSetupState {
   const ProfileSetupState({
     this.name = '',
     this.timezone = 'UTC',
+    this.language = 'en',
     this.avatarFile,
     this.existingAvatarUrl,
     this.isLoading = false,
@@ -32,6 +34,7 @@ class ProfileSetupState {
   ProfileSetupState copyWith({
     String? name,
     String? timezone,
+    String? language,
     XFile? avatarFile,
     String? existingAvatarUrl,
     bool? isLoading,
@@ -43,6 +46,7 @@ class ProfileSetupState {
     return ProfileSetupState(
       name: name ?? this.name,
       timezone: timezone ?? this.timezone,
+      language: language ?? this.language,
       avatarFile: avatarFile ?? this.avatarFile,
       existingAvatarUrl: existingAvatarUrl ?? this.existingAvatarUrl,
       isLoading: isLoading ?? this.isLoading,
@@ -59,6 +63,7 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
     final currentUser = ref.watch(currentUserProvider);
     final initialName = currentUser?.name ?? '';
     final initialTimezone = currentUser?.timezone ?? 'UTC';
+    final initialLanguage = currentUser?.language ?? 'en';
     final initialAvatarUrl = currentUser?.avatarUrl;
 
     // Detect device timezone asynchronously if available
@@ -67,7 +72,19 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
     return ProfileSetupState(
       name: initialName,
       timezone: initialTimezone,
+      language: initialLanguage,
       existingAvatarUrl: initialAvatarUrl,
+    );
+  }
+
+  void loadUser(UserModel user) {
+    state = state.copyWith(
+      name: user.name,
+      timezone: user.timezone,
+      language: user.language,
+      existingAvatarUrl: user.avatarUrl,
+      clearErrorMessage: true,
+      clearNameError: true,
     );
   }
 
@@ -97,6 +114,13 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
     );
   }
 
+  void setLanguage(String value) {
+    state = state.copyWith(
+      language: value,
+      clearErrorMessage: true,
+    );
+  }
+
   void setAvatar(XFile file) {
     state = state.copyWith(
       avatarFile: file,
@@ -111,6 +135,7 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
   Future<void> submit({
     required ApiClient apiClient,
     required BuildContext context,
+    bool isEditing = false,
   }) async {
     final name = state.name.trim();
     if (name.isEmpty) {
@@ -147,16 +172,25 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
         data: {
           'name': name,
           'timezone': state.timezone,
+          'language': state.language,
         },
       );
 
       final updatedUser = UserModel.fromJson(response.data);
       ref.read(authNotifierProvider.notifier).setUser(updatedUser);
 
-      state = state.copyWith(isLoading: false);
+      state = state.copyWith(
+        isLoading: false,
+        existingAvatarUrl: updatedUser.avatarUrl,
+        avatarFile: null,
+      );
 
       if (context.mounted) {
-        context.go(AppRoutes.goalCategoryPath);
+        if (isEditing) {
+          context.pop();
+        } else {
+          context.go(AppRoutes.goalCategoryPath);
+        }
       }
     } on ApiException catch (e) {
       state = state.copyWith(

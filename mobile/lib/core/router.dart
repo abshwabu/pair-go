@@ -22,6 +22,11 @@ import '../features/todos/todo_list_screen.dart';
 import '../features/checkins/checkins_screen.dart';
 import '../features/checkins/streak_detail_screen.dart';
 import '../features/checkins/streak_recovery_screen.dart';
+import '../features/account/account_settings_screen.dart';
+import '../features/account/blocked_users_screen.dart';
+import '../features/account/notification_settings_screen.dart';
+import '../features/account/profile_screen.dart';
+import '../features/account/report_form_screen.dart';
 
 /// String constants for all route names and paths.
 class AppRoutes {
@@ -196,7 +201,17 @@ GoRouter createRouter({
       GoRoute(
         name: AppRoutes.profileSetup,
         path: AppRoutes.profileSetupPath,
-        builder: (context, state) => const ProfileSetupScreen(),
+        builder: (context, state) {
+          bool isEditing = false;
+          if (state.extra is Map<String, dynamic>) {
+            isEditing = (state.extra as Map<String, dynamic>)['is_editing'] == true;
+          } else if (state.extra is bool) {
+            isEditing = state.extra as bool;
+          } else if (state.uri.queryParameters['edit'] == 'true') {
+            isEditing = true;
+          }
+          return ProfileSetupScreen(isEditing: isEditing);
+        },
       ),
       GoRoute(
         name: AppRoutes.goalCategory,
@@ -332,29 +347,41 @@ GoRouter createRouter({
       GoRoute(
         name: AppRoutes.profile,
         path: AppRoutes.profilePath,
-        builder: (context, state) => const RouteStubScreen(routeName: AppRoutes.profile),
+        builder: (context, state) => const ProfileScreen(),
       ),
       GoRoute(
         name: AppRoutes.notificationSettings,
         path: AppRoutes.notificationSettingsPath,
-        builder: (context, state) =>
-            const RouteStubScreen(routeName: AppRoutes.notificationSettings),
+        builder: (context, state) => const NotificationSettingsScreen(),
       ),
       GoRoute(
         name: AppRoutes.blockedUsers,
         path: AppRoutes.blockedUsersPath,
-        builder: (context, state) => const RouteStubScreen(routeName: AppRoutes.blockedUsers),
+        builder: (context, state) => const BlockedUsersScreen(),
       ),
       GoRoute(
         name: AppRoutes.reportForm,
         path: AppRoutes.reportFormPath,
-        builder: (context, state) => const RouteStubScreen(routeName: AppRoutes.reportForm),
+        builder: (context, state) {
+          String? reportedUserId;
+          String? podId;
+          if (state.extra is Map<String, dynamic>) {
+            final extra = state.extra as Map<String, dynamic>;
+            reportedUserId = extra['reported_user_id']?.toString();
+            podId = extra['pod_id']?.toString();
+          }
+          reportedUserId ??= state.uri.queryParameters['reported_user_id'];
+          podId ??= state.uri.queryParameters['pod_id'];
+          return ReportFormScreen(
+            reportedUserId: reportedUserId,
+            podId: podId,
+          );
+        },
       ),
       GoRoute(
         name: AppRoutes.accountSettings,
         path: AppRoutes.accountSettingsPath,
-        builder: (context, state) =>
-            const RouteStubScreen(routeName: AppRoutes.accountSettings),
+        builder: (context, state) => const AccountSettingsScreen(),
       ),
     ],
   );

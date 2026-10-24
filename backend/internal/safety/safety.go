@@ -55,13 +55,15 @@ type UserSummary struct {
 
 // ReportDetail includes reporter and reported user metadata for admin reviews.
 type ReportDetail struct {
-	ID           string       `json:"id"`
-	Reporter     UserSummary  `json:"reporter"`
-	ReportedUser UserSummary  `json:"reported_user"`
-	PodID        *string      `json:"pod_id"`
-	Reason       string       `json:"reason"`
-	Status       ReportStatus `json:"status"`
-	CreatedAt    time.Time    `json:"created_at"`
+	ID             string       `json:"id"`
+	ReporterID     string       `json:"reporter_id"`
+	ReportedUserID string       `json:"reported_user_id"`
+	Reporter       UserSummary  `json:"reporter"`
+	ReportedUser   UserSummary  `json:"reported_user"`
+	PodID          *string      `json:"pod_id"`
+	Reason         string       `json:"reason"`
+	Status         ReportStatus `json:"status"`
+	CreatedAt      time.Time    `json:"created_at"`
 }
 
 // Block represents a block record in the blocks table.
@@ -72,13 +74,21 @@ type Block struct {
 	CreatedAt     time.Time `json:"created_at"`
 }
 
+// BlockedUserInfo provides public user info of a blocked user.
+type BlockedUserInfo struct {
+	ID        string  `json:"id"`
+	Name      string  `json:"name"`
+	AvatarURL *string `json:"avatar_url"`
+}
+
 // BlockedUserDetail represents a blocked user with their public profile.
 type BlockedUserDetail struct {
-	ID            string    `json:"id"` // block ID
-	BlockedUserID string    `json:"blocked_user_id"`
-	Name          string    `json:"name"`
-	AvatarURL     *string   `json:"avatar_url"`
-	CreatedAt     time.Time `json:"created_at"`
+	ID            string           `json:"id"` // block ID
+	BlockedUserID string           `json:"blocked_user_id"`
+	Name          string           `json:"name"`
+	AvatarURL     *string          `json:"avatar_url"`
+	BlockedUser   *BlockedUserInfo `json:"blocked_user,omitempty"`
+	CreatedAt     time.Time        `json:"created_at"`
 }
 
 // Repository handles safety database operations (reports and blocks).
@@ -97,19 +107,43 @@ func NewRepository(writeDB, readDB *sql.DB) *Repository {
 
 // CreateReport inserts a new report into the database.
 func (r *Repository) CreateReport(ctx context.Context, rep *Report) error {
+	// Verify reported user exists and is not deleted
+	var count int
+	err := r.readDB.QueryRowContext(ctx, `SELECT COUNT(*) FROM users WHERE id = ? AND deleted_at IS NULL;`, rep.ReportedUserID).Scan(&count)
+	if err != nil {
+		return fmt.Errorf("failed to verify reported user: %w", err)
+	}
+	if count == 0 {
+		return ErrUserNotFound
+	}
+
 	query := `
 		INSERT INTO reports (id, reporter_id, reported_user_id, pod_id, reason, status, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?);
 	`
 	createdAtStr := rep.CreatedAt.UTC().Format(time.RFC3339)
 
-	_, err := r.writeDB.ExecContext(ctx, query,
+	_, err = r.writeDB.ExecContext(ctx, query,
 		rep.ID, rep.ReporterID, rep.ReportedUserID, rep.PodID, rep.Reason, string(rep.Status), createdAtStr,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create report: %w", err)
 	}
 	return nil
+}
+
+// IsPodMember checks whether a user is or was a member of the given pod.
+func (r *Repository) IsPodMember(ctx context.Context, podID, userID string) (bool, error) {
+	var count int
+	err := r.readDB.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM pod_members
+		WHERE pod_id = ? AND user_id = ?;
+	`, podID, userID).Scan(&count)
+	if err != nil {
+		return false, fmt.Errorf("failed to check pod membership: %w", err)
+	}
+	return count > 0, nil
 }
 
 // GetReportByID retrieves a report by ID.
@@ -143,12 +177,12 @@ func (r *Repository) GetReportByID(ctx context.Context, id string) (*Report, err
 // ListReports retrieves reports ordered newest first, optionally filtered by status.
 func (r *Repository) ListReports(ctx context.Context, status *ReportStatus) ([]ReportDetail, error) {
 	query := `
-		SELECT r.id, r.reporter_id, u1.name, u1.email,
-		       r.reported_user_id, u2.name, u2.email,
+		SELECT r.id, r.reporter_id, COALESCE(u1.name, ''), COALESCE(u1.email, ''),
+		       r.reported_user_id, COALESCE(u2.name, ''), COALESCE(u2.email, ''),
 		       r.pod_id, r.reason, r.status, r.created_at
 		FROM reports r
-		JOIN users u1 ON r.reporter_id = u1.id
-		JOIN users u2 ON r.reported_user_id = u2.id
+		LEFT JOIN users u1 ON r.reporter_id = u1.id
+		LEFT JOIN users u2 ON r.reported_user_id = u2.id
 		WHERE (? IS NULL OR r.status = ?)
 		ORDER BY r.created_at DESC;
 	`
@@ -178,6 +212,9 @@ func (r *Repository) ListReports(ctx context.Context, status *ReportStatus) ([]R
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan report detail: %w", err)
 		}
+
+		rd.ReporterID = rd.Reporter.ID
+		rd.ReportedUserID = rd.ReportedUser.ID
 
 		if podID.Valid {
 			val := podID.String
@@ -242,6 +279,10 @@ func (r *Repository) CreateBlock(ctx context.Context, userID, blockedUserID stri
 		return nil, nil, ErrUserNotFound
 	}
 
+	if podsRepo == nil {
+		podsRepo = pods.NewRepository(r.writeDB, r.readDB)
+	}
+
 	tx, err := r.writeDB.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to begin block transaction: %w", err)
@@ -282,8 +323,8 @@ func (r *Repository) CreateBlock(ctx context.Context, userID, blockedUserID stri
 	sharedQuery := `
 		SELECT p.id
 		FROM pods p
-		JOIN pod_members pm1 ON p.id = pm1.pod_id AND pm1.user_id = ? AND pm1.left_at IS NULL
-		JOIN pod_members pm2 ON p.id = pm2.pod_id AND pm2.user_id = ? AND pm2.left_at IS NULL
+		JOIN pod_members pm1 ON p.id = pm1.pod_id AND pm1.user_id = ? AND (pm1.left_at IS NULL OR pm1.left_at = '')
+		JOIN pod_members pm2 ON p.id = pm2.pod_id AND pm2.user_id = ? AND (pm2.left_at IS NULL OR pm2.left_at = '')
 		WHERE p.status = 'active';
 	`
 	rows, err := tx.QueryContext(ctx, sharedQuery, userID, blockedUserID)
@@ -308,12 +349,11 @@ func (r *Repository) CreateBlock(ctx context.Context, userID, blockedUserID stri
 	// 5. Dissolve shared active pods by leaving both members in the SAME transaction
 	for _, podID := range sharedPodIDs {
 		// Use podsRepo.LeaveUserTx to ensure both leave and status becomes 'dissolved'
-		if podsRepo != nil {
-			_ = podsRepo.LeaveUserTx(ctx, tx, podID, userID)
-			_ = podsRepo.LeaveUserTx(ctx, tx, podID, blockedUserID)
-		} else {
-			_ = pods.LeaveUserTx(ctx, tx, podID, userID)
-			_ = pods.LeaveUserTx(ctx, tx, podID, blockedUserID)
+		if err := podsRepo.LeaveUserTx(ctx, tx, podID, userID); err != nil && !errors.Is(err, pods.ErrAlreadyLeft) {
+			return nil, nil, fmt.Errorf("failed to leave user from pod %s: %w", podID, err)
+		}
+		if err := podsRepo.LeaveUserTx(ctx, tx, podID, blockedUserID); err != nil && !errors.Is(err, pods.ErrAlreadyLeft) {
+			return nil, nil, fmt.Errorf("failed to leave blocked user from pod %s: %w", podID, err)
 		}
 	}
 
@@ -341,7 +381,7 @@ func (r *Repository) CreateBlock(ctx context.Context, userID, blockedUserID stri
 // ListBlocks retrieves the authenticated user's blocks with public profile metadata.
 func (r *Repository) ListBlocks(ctx context.Context, userID string) ([]BlockedUserDetail, error) {
 	query := `
-		SELECT b.id, b.blocked_user_id, u.name, u.avatar_url, b.created_at
+		SELECT b.id, b.blocked_user_id, COALESCE(u.name, ''), u.avatar_url, b.created_at
 		FROM blocks b
 		JOIN users u ON b.blocked_user_id = u.id
 		WHERE b.user_id = ?
@@ -372,6 +412,12 @@ func (r *Repository) ListBlocks(ctx context.Context, userID string) ([]BlockedUs
 			b.CreatedAt = parsed
 		}
 
+		b.BlockedUser = &BlockedUserInfo{
+			ID:        b.BlockedUserID,
+			Name:      b.Name,
+			AvatarURL: b.AvatarURL,
+		}
+
 		blocks = append(blocks, b)
 	}
 	if err := rows.Err(); err != nil {
@@ -388,8 +434,10 @@ func (r *Repository) DeleteBlock(ctx context.Context, idOrBlockedUserID, current
 	err := r.readDB.QueryRowContext(ctx, `
 		SELECT id, user_id
 		FROM blocks
-		WHERE id = ? OR (user_id = ? AND blocked_user_id = ?);
-	`, idOrBlockedUserID, currentUserID, idOrBlockedUserID).Scan(&actualBlockID, &blockOwnerID)
+		WHERE id = ? OR (user_id = ? AND blocked_user_id = ?)
+		ORDER BY CASE WHEN user_id = ? THEN 0 ELSE 1 END
+		LIMIT 1;
+	`, idOrBlockedUserID, currentUserID, idOrBlockedUserID, currentUserID).Scan(&actualBlockID, &blockOwnerID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrBlockNotFound

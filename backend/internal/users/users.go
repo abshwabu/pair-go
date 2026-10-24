@@ -286,3 +286,53 @@ func (r *Repository) ClearFCMToken(ctx context.Context, token string) error {
 	return nil
 }
 
+// UpdatePasswordHash updates the user's password_hash field.
+func (r *Repository) UpdatePasswordHash(ctx context.Context, id, passwordHash string) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	query := `UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL;`
+	res, err := r.writeDB.ExecContext(ctx, query, passwordHash, now, id)
+	if err != nil {
+		return fmt.Errorf("failed to update password: %w", err)
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check rows affected: %w", err)
+	}
+	if rows == 0 {
+		return ErrUserNotFound
+	}
+
+	return nil
+}
+
+// AnonymizeAndDeleteTx soft-deletes and anonymizes a user within an existing transaction.
+func (r *Repository) AnonymizeAndDeleteTx(ctx context.Context, tx *sql.Tx, id string) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	anonymizedEmail := fmt.Sprintf("deleted_%s@pair.local", id)
+	query := `
+		UPDATE users
+		SET name = 'Deleted User',
+		    email = ?,
+		    avatar_url = NULL,
+		    fcm_token = NULL,
+		    deleted_at = ?,
+		    updated_at = ?
+		WHERE id = ?;
+	`
+	res, err := tx.ExecContext(ctx, query, anonymizedEmail, now, now, id)
+	if err != nil {
+		return fmt.Errorf("failed to anonymize and delete user: %w", err)
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check rows affected: %w", err)
+	}
+	if rows == 0 {
+		return ErrUserNotFound
+	}
+
+	return nil
+}
+

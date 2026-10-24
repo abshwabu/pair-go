@@ -8,10 +8,16 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/error_banner.dart';
+import '../auth/auth_state.dart';
 import 'profile_setup_provider.dart';
 
 class ProfileSetupScreen extends ConsumerStatefulWidget {
-  const ProfileSetupScreen({super.key});
+  final bool isEditing;
+
+  const ProfileSetupScreen({
+    super.key,
+    this.isEditing = false,
+  });
 
   @override
   ConsumerState<ProfileSetupScreen> createState() => _ProfileSetupScreenState();
@@ -41,6 +47,30 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
     'Asia/Tokyo',
     'Australia/Sydney',
   ];
+
+  static const Map<String, String> _languages = {
+    'en': 'English',
+    'es': 'Spanish',
+    'fr': 'French',
+    'de': 'German',
+    'am': 'Amharic',
+    'zh': 'Chinese',
+    'ja': 'Japanese',
+    'ar': 'Arabic',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isEditing) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final user = ref.read(currentUserProvider);
+        if (user != null) {
+          ref.read(profileSetupNotifierProvider.notifier).loadUser(user);
+        }
+      });
+    }
+  }
 
   Future<void> _pickAvatar() async {
     try {
@@ -150,6 +180,68 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
     );
   }
 
+  void _showLanguagePicker(BuildContext context, String currentLanguage) {
+    showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
+      ),
+      builder: (bottomSheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).dividerColor,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    Text(
+                      'Select Language',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ],
+                ),
+              ),
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  children: _languages.entries.map((entry) {
+                    final isSelected = entry.key == currentLanguage;
+                    return ListTile(
+                      title: Text(entry.value),
+                      subtitle: Text(entry.key.toUpperCase()),
+                      trailing: isSelected
+                          ? Icon(
+                              Icons.check_circle_rounded,
+                              color: Theme.of(context).colorScheme.primary,
+                            )
+                          : null,
+                      onTap: () {
+                        ref
+                            .read(profileSetupNotifierProvider.notifier)
+                            .setLanguage(entry.key);
+                        Navigator.of(context).pop();
+                      },
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -164,9 +256,12 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
       avatarImage = NetworkImage(state.existingAvatarUrl!);
     }
 
+    final languageDisplayName =
+        _languages[state.language] ?? state.language.toUpperCase();
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Profile Setup'),
+        title: Text(widget.isEditing ? 'Edit Profile' : 'Profile Setup'),
       ),
       body: SafeArea(
         child: Center(
@@ -178,13 +273,17 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'Complete your profile',
+                    widget.isEditing
+                        ? 'Edit your profile'
+                        : 'Complete your profile',
                     style: theme.textTheme.headlineLarge,
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    'Add your photo and verify your timezone for pairing',
+                    widget.isEditing
+                        ? 'Update your photo, name, timezone, and language'
+                        : 'Add your photo and verify your timezone for pairing',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -275,15 +374,36 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: AppSpacing.md),
+
+                  // Language Selector
+                  InkWell(
+                    onTap: state.isLoading
+                        ? null
+                        : () => _showLanguagePicker(context, state.language),
+                    borderRadius: AppRadius.borderRadiusMd,
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'Language',
+                        prefixIcon: Icon(Icons.language_rounded),
+                        suffixIcon: Icon(Icons.arrow_drop_down_rounded),
+                      ),
+                      child: Text(
+                        languageDisplayName,
+                        style: theme.textTheme.bodyLarge,
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: AppSpacing.xl),
 
-                  // Continue Button
+                  // Continue / Save Changes Button
                   ElevatedButton(
                     onPressed: state.isLoading
                         ? null
                         : () => notifier.submit(
                               apiClient: ref.read(apiClientProvider),
                               context: context,
+                              isEditing: widget.isEditing,
                             ),
                     child: state.isLoading
                         ? SizedBox(
@@ -294,7 +414,9 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                               color: theme.colorScheme.onPrimary,
                             ),
                           )
-                        : const Text('Continue to Goals'),
+                        : Text(widget.isEditing
+                            ? 'Save Changes'
+                            : 'Continue to Goals'),
                   ),
                 ],
               ),

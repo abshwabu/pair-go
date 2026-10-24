@@ -126,19 +126,23 @@ func (h *Handler) CreateReport(w http.ResponseWriter, r *http.Request) {
 		pid := strings.TrimSpace(*req.PodID)
 		podID = &pid
 
-		// If pod_id is given, the reporter must be an active member of that pod
+		// If pod_id is given, the reporter must be a member of that pod
+		isMember := false
 		if h.podsRepo != nil {
 			_, err := h.podsRepo.GetActiveMember(r.Context(), pid, user.ID)
-			if err != nil {
-				respondError(w, http.StatusForbidden, "FORBIDDEN", "you must be an active member of the specified pod to report within it")
-				return
+			if err == nil {
+				isMember = true
 			}
-		} else {
-			_, err := pods.RequireMemberUser(r.Context(), pid, user.ID)
-			if err != nil {
-				respondError(w, http.StatusForbidden, "FORBIDDEN", "you must be an active member of the specified pod to report within it")
-				return
+		}
+		if !isMember && h.repo != nil {
+			m, err := h.repo.IsPodMember(r.Context(), pid, user.ID)
+			if err == nil && m {
+				isMember = true
 			}
+		}
+		if !isMember {
+			respondError(w, http.StatusForbidden, "FORBIDDEN", "you must be a member of the specified pod to report within it")
+			return
 		}
 	}
 
@@ -153,6 +157,10 @@ func (h *Handler) CreateReport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.repo.CreateReport(r.Context(), rep); err != nil {
+		if errors.Is(err, ErrUserNotFound) {
+			respondError(w, http.StatusNotFound, "NOT_FOUND", "reported user not found")
+			return
+		}
 		respondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to create report: "+err.Error())
 		return
 	}
@@ -316,5 +324,33 @@ func (h *Handler) DeleteBlock(w http.ResponseWriter, r *http.Request) {
 
 	respondJSON(w, http.StatusOK, map[string]string{
 		"message": "unblocked successfully",
+	})
+}
+
+// RegisterRoutes registers safety endpoints on a Chi router.
+func (h *Handler) RegisterRoutes(r chi.Router, authMW func(http.Handler) http.Handler, adminMW ...func(http.Handler) http.Handler) {
+	var admMW func(http.Handler) http.Handler
+	if len(adminMW) > 0 && adminMW[0] != nil {
+		admMW = adminMW[0]
+	}
+
+	r.Route("/reports", func(r chi.Router) {
+		r.Use(authMW)
+		r.Post("/", h.CreateReport)
+
+		if admMW != nil {
+			r.Group(func(r chi.Router) {
+				r.Use(admMW)
+				r.Get("/", h.ListReports)
+				r.Patch("/{id}", h.UpdateReport)
+			})
+		}
+	})
+
+	r.Route("/blocks", func(r chi.Router) {
+		r.Use(authMW)
+		r.Post("/", h.CreateBlock)
+		r.Get("/", h.ListBlocks)
+		r.Delete("/{id}", h.DeleteBlock)
 	})
 }

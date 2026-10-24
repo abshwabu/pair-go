@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"io"
@@ -11,6 +12,8 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/abshwabu/pair/backend/internal/auth"
+	"github.com/abshwabu/pair/backend/internal/chat"
+	"github.com/abshwabu/pair/backend/internal/pods"
 	"github.com/abshwabu/pair/backend/internal/storage"
 	"github.com/abshwabu/pair/backend/internal/users"
 )
@@ -18,13 +21,28 @@ import (
 // ProfileHandler handles user profile endpoints.
 type ProfileHandler struct {
 	usersRepo      *users.Repository
+	authRepo       *auth.Repository
+	podsRepo       *pods.Repository
+	chatHub        *chat.Hub
+	writeDB        *sql.DB
 	storageService storage.StorageService
 }
 
 // NewProfileHandler creates a new ProfileHandler instance.
-func NewProfileHandler(usersRepo *users.Repository, storageService storage.StorageService) *ProfileHandler {
+func NewProfileHandler(
+	usersRepo *users.Repository,
+	authRepo *auth.Repository,
+	podsRepo *pods.Repository,
+	chatHub *chat.Hub,
+	writeDB *sql.DB,
+	storageService storage.StorageService,
+) *ProfileHandler {
 	return &ProfileHandler{
 		usersRepo:      usersRepo,
+		authRepo:       authRepo,
+		podsRepo:       podsRepo,
+		chatHub:        chatHub,
+		writeDB:        writeDB,
 		storageService: storageService,
 	}
 }
@@ -249,5 +267,147 @@ func (h *ProfileHandler) UpdateFCMToken(w http.ResponseWriter, r *http.Request) 
 	}
 
 	OK(w, http.StatusOK, freshUser)
+}
+
+// ChangePasswordRequest represents the request payload for PATCH /api/v1/profile/password.
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}
+
+// ChangePassword handles PATCH /api/v1/profile/password.
+func (h *ProfileHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.UserFromContext(r.Context())
+	if !ok || user == nil {
+		Fail(w, http.StatusUnauthorized, "UNAUTHORIZED", "user not authenticated")
+		return
+	}
+
+	var req ChangePasswordRequest
+	if err := DecodeJSON(r, &req); err != nil {
+		ValidationError(w, err.Error())
+		return
+	}
+
+	if req.CurrentPassword == "" {
+		ValidationError(w, "current_password is required")
+		return
+	}
+	if len(req.NewPassword) < 8 {
+		ValidationError(w, "new_password must be at least 8 characters")
+		return
+	}
+
+	// Refetch fresh user to obtain current password hash
+	freshUser, err := h.usersRepo.GetByID(r.Context(), user.ID)
+	if err != nil {
+		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to load user")
+		return
+	}
+
+	if !auth.CheckPassword(req.CurrentPassword, freshUser.PasswordHash) {
+		Fail(w, http.StatusBadRequest, "INVALID_PASSWORD", "current password is incorrect")
+		return
+	}
+
+	newHash, err := auth.HashPassword(req.NewPassword)
+	if err != nil {
+		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to hash new password")
+		return
+	}
+
+	if err := h.usersRepo.UpdatePasswordHash(r.Context(), user.ID, newHash); err != nil {
+		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to update password")
+		return
+	}
+
+	// Revoke all other tokens for the user, retaining only the current token
+	if currentTokenHash, ok := auth.TokenHashFromContext(r.Context()); ok && currentTokenHash != "" {
+		if h.authRepo != nil {
+			_ = h.authRepo.DeleteAllExcept(r.Context(), user.ID, currentTokenHash)
+		}
+	}
+
+	OK(w, http.StatusOK, map[string]string{
+		"message": "password updated successfully",
+	})
+}
+
+// DeleteAccount handles DELETE /api/v1/profile.
+func (h *ProfileHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.UserFromContext(r.Context())
+	if !ok || user == nil {
+		Fail(w, http.StatusUnauthorized, "UNAUTHORIZED", "user not authenticated")
+		return
+	}
+
+	tx, err := h.writeDB.BeginTx(r.Context(), nil)
+	if err != nil {
+		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to start deletion transaction")
+		return
+	}
+	defer tx.Rollback()
+
+	// 1. Find all active pods for user
+	activePodsQuery := `
+		SELECT p.id
+		FROM pods p
+		JOIN pod_members pm ON p.id = pm.pod_id AND pm.user_id = ? AND (pm.left_at IS NULL OR pm.left_at = '')
+		WHERE p.status = 'active';
+	`
+	rows, err := tx.QueryContext(r.Context(), activePodsQuery, user.ID)
+	if err != nil {
+		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to query user pods: "+err.Error())
+		return
+	}
+	var podIDs []string
+	for rows.Next() {
+		var pid string
+		if err := rows.Scan(&pid); err == nil {
+			podIDs = append(podIDs, pid)
+		}
+	}
+	rows.Close()
+
+	// 2. Leave and dissolve active pods
+	for _, pid := range podIDs {
+		if h.podsRepo != nil {
+			_ = h.podsRepo.LeaveUserTx(r.Context(), tx, pid, user.ID)
+		} else {
+			_ = pods.LeaveUserTx(r.Context(), tx, pid, user.ID)
+		}
+	}
+
+	// 3. Anonymize user record and set deleted_at
+	if err := h.usersRepo.AnonymizeAndDeleteTx(r.Context(), tx, user.ID); err != nil {
+		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to anonymize user: "+err.Error())
+		return
+	}
+
+	// 4. Delete all auth tokens
+	if h.authRepo != nil {
+		if err := h.authRepo.DeleteAllForUserTx(r.Context(), tx, user.ID); err != nil {
+			Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to delete auth tokens: "+err.Error())
+			return
+		}
+	} else {
+		_, _ = tx.ExecContext(r.Context(), `DELETE FROM auth_tokens WHERE user_id = ?;`, user.ID)
+	}
+
+	if err := tx.Commit(); err != nil {
+		Fail(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to commit account deletion: "+err.Error())
+		return
+	}
+
+	// 5. Close live sockets for all affected pods
+	if h.chatHub != nil {
+		for _, pid := range podIDs {
+			h.chatHub.ClosePod(pid)
+		}
+	}
+
+	OK(w, http.StatusOK, map[string]string{
+		"message": "account deleted successfully",
+	})
 }
 
