@@ -7,6 +7,7 @@ import '../../core/router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/error_banner.dart';
 import '../auth/auth_state.dart';
+import '../pods/models/pod_model.dart';
 import '../pods/pod_state.dart';
 
 class MatchFoundScreen extends ConsumerStatefulWidget {
@@ -22,6 +23,9 @@ class MatchFoundScreen extends ConsumerStatefulWidget {
 }
 
 class _MatchFoundScreenState extends ConsumerState<MatchFoundScreen> {
+  bool _isRejecting = false;
+  String? _rejectError;
+
   @override
   void initState() {
     super.initState();
@@ -32,6 +36,114 @@ class _MatchFoundScreenState extends ConsumerState<MatchFoundScreen> {
             podId: widget.podId,
           );
     });
+  }
+
+  Future<void> _handleRejectSuggestion(
+    String targetPodId,
+    PodMemberDetail? partner,
+  ) async {
+    bool blockPartner = false;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Reject Suggestion?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Are you sure you want to decline this accountability partner suggestion with ${partner?.user.name.isNotEmpty == true ? partner!.user.name : "this partner"}?',
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'This pod will be dissolved and you can search for a different partner.',
+                style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+              if (partner != null && partner.user.id.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.md),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  value: blockPartner,
+                  onChanged: (val) {
+                    setDialogState(() {
+                      blockPartner = val ?? false;
+                    });
+                  },
+                  title: const Text(
+                    "Don't suggest this user again (block)",
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                  ),
+                  controlAffinity: ListTileControlAffinity.leading,
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(false),
+              child: const Text('Keep Match'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(ctx).colorScheme.error,
+                foregroundColor: Theme.of(ctx).colorScheme.onError,
+              ),
+              onPressed: () => Navigator.of(dialogCtx).pop(true),
+              child: const Text('Reject Suggestion'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _isRejecting = true;
+      _rejectError = null;
+    });
+
+    final apiClient = ref.read(apiClientProvider);
+
+    try {
+      if (blockPartner && partner != null && partner.user.id.isNotEmpty) {
+        // Block dissolves pod in the same transaction
+        await apiClient.post<Map<String, dynamic>>(
+          '/blocks',
+          data: {'blocked_user_id': partner.user.id},
+        );
+      } else {
+        await apiClient.post<Map<String, dynamic>>('/pods/$targetPodId/leave');
+      }
+
+      ref.read(activePodDetailProvider.notifier).clearPod();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Match suggestion rejected. Let’s find a new partner!'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      context.go(AppRoutes.matchingPrefsPath);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isRejecting = false;
+        _rejectError = e.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isRejecting = false;
+        _rejectError = 'Failed to reject match suggestion. Please try again.';
+      });
+    }
   }
 
   @override
@@ -270,24 +382,82 @@ class _MatchFoundScreenState extends ConsumerState<MatchFoundScreen> {
                   ),
                 ),
 
+              if (_rejectError != null) ...[
+                const SizedBox(height: AppSpacing.md),
+                ErrorBanner(message: _rejectError!),
+              ],
+
               const SizedBox(height: AppSpacing.xxl),
 
               // "Let's start" button
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed: () {
-                    final targetPodId = pod?.id ?? widget.podId;
-                    context.go(
-                      AppRoutes.podHomePath,
-                      extra: targetPodId,
-                    );
-                  },
+                  onPressed: _isRejecting
+                      ? null
+                      : () {
+                          final targetPodId = pod?.id ?? widget.podId;
+                          context.go(
+                            AppRoutes.podHomePath,
+                            extra: targetPodId,
+                          );
+                        },
                   icon: const Icon(Icons.arrow_forward_rounded),
                   label: const Text("Let's start"),
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
                       vertical: AppSpacing.md,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: AppRadius.borderRadiusMd,
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: AppSpacing.md),
+
+              // "Reject Suggestion" button
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _isRejecting
+                      ? null
+                      : () {
+                          final targetPodId = pod?.id ?? widget.podId;
+                          if (targetPodId != null && targetPodId.isNotEmpty) {
+                            _handleRejectSuggestion(
+                              targetPodId,
+                              partner,
+                            );
+                          }
+                        },
+                  icon: _isRejecting
+                      ? SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: theme.colorScheme.error,
+                          ),
+                        )
+                      : Icon(
+                          Icons.close_rounded,
+                          color: theme.colorScheme.error,
+                        ),
+                  label: Text(
+                    _isRejecting ? 'Rejecting...' : 'Reject Suggestion',
+                    style: TextStyle(
+                      color: theme.colorScheme.error,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.md,
+                    ),
+                    side: BorderSide(
+                      color: theme.colorScheme.error.withValues(alpha: 0.5),
                     ),
                     shape: RoundedRectangleBorder(
                       borderRadius: AppRadius.borderRadiusMd,

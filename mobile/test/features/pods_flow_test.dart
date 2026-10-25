@@ -362,5 +362,115 @@ void main() {
       expect(blockCalled, isTrue);
       expect(find.text('Goal Category Selection Screen'), findsOneWidget);
     });
+
+    testWidgets(
+        'PodHomeScreen Reject Suggestion button triggers confirmation dialog and dissolves pod',
+        (WidgetTester tester) async {
+      bool leaveCalled = false;
+      final dio = Dio();
+      dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            if (options.path == '/pods/pod-abc') {
+              return handler.resolve(
+                Response(
+                  requestOptions: options,
+                  statusCode: 200,
+                  data: {
+                    'data': mockPod.toJson(),
+                    'meta': null,
+                    'error': null,
+                  },
+                ),
+              );
+            }
+            if (options.path == '/pods/pod-abc/todos') {
+              return handler.resolve(
+                Response(
+                  requestOptions: options,
+                  statusCode: 200,
+                  data: {
+                    'data': [],
+                    'meta': null,
+                    'error': null,
+                  },
+                ),
+              );
+            }
+            if (options.path == '/pods/pod-abc/leave' && options.method == 'POST') {
+              leaveCalled = true;
+              return handler.resolve(
+                Response(
+                  requestOptions: options,
+                  statusCode: 200,
+                  data: {
+                    'data': {'status': 'left'},
+                    'meta': null,
+                    'error': null,
+                  },
+                ),
+              );
+            }
+            return handler.next(options);
+          },
+        ),
+      );
+
+      final apiClient = ApiClient(tokenStorage: TokenStorage(), customDio: dio);
+
+      final router = GoRouter(
+        initialLocation: AppRoutes.podHomePath,
+        routes: [
+          GoRoute(
+            path: AppRoutes.podHomePath,
+            builder: (context, state) => const PodHomeScreen(podId: 'pod-abc'),
+          ),
+          GoRoute(
+            path: AppRoutes.goalCategoryPath,
+            builder: (context, state) => const Scaffold(
+              body: Text('Goal Category Selection Screen'),
+            ),
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWithValue(apiClient),
+            currentUserProvider.overrideWith((ref) => const UserModel(
+                  id: 'me',
+                  email: 'john@example.com',
+                  name: 'John Doe',
+                  timezone: 'UTC',
+                  language: 'en',
+                )),
+          ],
+          child: MaterialApp.router(
+            theme: AppTheme.lightTheme,
+            routerConfig: router,
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Reject Suggestion / Change Partner'), findsOneWidget);
+
+      await tester.ensureVisible(find.text('Reject Suggestion / Change Partner'));
+      await tester.tap(find.text('Reject Suggestion / Change Partner'));
+      await tester.pumpAndSettle();
+
+      // Dialog opens
+      expect(find.text('Reject Suggestion?'), findsOneWidget);
+      expect(find.text("Don't suggest this user again (block)"), findsOneWidget);
+
+      // Confirm rejection
+      await tester.tap(find.widgetWithText(FilledButton, 'Reject Suggestion'));
+      await tester.pumpAndSettle();
+
+      expect(leaveCalled, isTrue);
+      expect(find.text('Goal Category Selection Screen'), findsOneWidget);
+    });
   });
 }

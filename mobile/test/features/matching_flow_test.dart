@@ -292,5 +292,248 @@ void main() {
 
       expect(find.text('Pod Home Screen Hub'), findsOneWidget);
     });
+
+    testWidgets('MatchFoundScreen Reject Suggestion leaves pod and navigates back',
+        (WidgetTester tester) async {
+      final mockPod = PodDetail(
+        id: 'pod-reject-1',
+        goalCategory: 'fitness',
+        status: 'active',
+        capacity: 2,
+        members: const [
+          PodMemberDetail(
+            user: MemberPublicProfile(id: 'me', name: 'John Doe'),
+            goal: MemberGoalInfo(
+              id: 'g-1',
+              title: 'My 5k goal',
+              category: 'fitness',
+              pace: 'steady',
+            ),
+          ),
+          PodMemberDetail(
+            user: MemberPublicProfile(
+              id: 'partner-99',
+              name: 'Candidate Alex',
+            ),
+            goal: MemberGoalInfo(
+              id: 'g-2',
+              title: 'Run every morning',
+              category: 'fitness',
+              pace: 'steady',
+            ),
+          ),
+        ],
+        streak: const StreakSummary(currentStreak: 0, bestStreak: 0),
+      );
+
+      bool leaveCalled = false;
+      final dio = Dio();
+      dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            if (options.path == '/pods/pod-reject-1' && options.method == 'GET') {
+              return handler.resolve(
+                Response(
+                  requestOptions: options,
+                  statusCode: 200,
+                  data: {
+                    'data': mockPod.toJson(),
+                    'meta': null,
+                    'error': null,
+                  },
+                ),
+              );
+            }
+            if (options.path == '/pods/pod-reject-1/leave' && options.method == 'POST') {
+              leaveCalled = true;
+              return handler.resolve(
+                Response(
+                  requestOptions: options,
+                  statusCode: 200,
+                  data: {
+                    'data': {'status': 'left'},
+                    'meta': null,
+                    'error': null,
+                  },
+                ),
+              );
+            }
+            return handler.next(options);
+          },
+        ),
+      );
+
+      final apiClient = ApiClient(tokenStorage: TokenStorage(), customDio: dio);
+
+      final router = GoRouter(
+        initialLocation: AppRoutes.matchFoundPath,
+        routes: [
+          GoRoute(
+            path: AppRoutes.matchFoundPath,
+            builder: (context, state) =>
+                const MatchFoundScreen(podId: 'pod-reject-1'),
+          ),
+          GoRoute(
+            path: AppRoutes.matchingPrefsPath,
+            builder: (context, state) => const Scaffold(
+              body: Text('Matching Preferences Screen'),
+            ),
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWithValue(apiClient),
+          ],
+          child: MaterialApp.router(
+            theme: AppTheme.lightTheme,
+            routerConfig: router,
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Reject Suggestion'), findsOneWidget);
+
+      await tester.ensureVisible(find.text('Reject Suggestion'));
+      await tester.tap(find.text('Reject Suggestion'));
+      await tester.pumpAndSettle();
+
+      // Confirmation dialog should be visible
+      expect(find.text('Reject Suggestion?'), findsOneWidget);
+      expect(find.text("Don't suggest this user again (block)"), findsOneWidget);
+
+      // Tap confirm Reject Suggestion in dialog
+      await tester.tap(find.widgetWithText(FilledButton, 'Reject Suggestion'));
+      await tester.pumpAndSettle();
+
+      expect(leaveCalled, isTrue);
+      expect(find.text('Matching Preferences Screen'), findsOneWidget);
+    });
+
+    testWidgets('MatchFoundScreen Reject Suggestion with block calls block API',
+        (WidgetTester tester) async {
+      final mockPod = PodDetail(
+        id: 'pod-reject-2',
+        goalCategory: 'fitness',
+        status: 'active',
+        capacity: 2,
+        members: const [
+          PodMemberDetail(
+            user: MemberPublicProfile(id: 'me', name: 'John Doe'),
+            goal: MemberGoalInfo(
+              id: 'g-1',
+              title: 'My 5k goal',
+              category: 'fitness',
+              pace: 'steady',
+            ),
+          ),
+          PodMemberDetail(
+            user: MemberPublicProfile(
+              id: 'partner-block-me',
+              name: 'Candidate Sam',
+            ),
+            goal: MemberGoalInfo(
+              id: 'g-2',
+              title: 'Daily cycling',
+              category: 'fitness',
+              pace: 'steady',
+            ),
+          ),
+        ],
+        streak: const StreakSummary(currentStreak: 0, bestStreak: 0),
+      );
+
+      bool blockCalled = false;
+      String? blockedUserId;
+      final dio = Dio();
+      dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            if (options.path == '/pods/pod-reject-2' && options.method == 'GET') {
+              return handler.resolve(
+                Response(
+                  requestOptions: options,
+                  statusCode: 200,
+                  data: {
+                    'data': mockPod.toJson(),
+                    'meta': null,
+                    'error': null,
+                  },
+                ),
+              );
+            }
+            if (options.path == '/blocks' && options.method == 'POST') {
+              blockCalled = true;
+              blockedUserId = (options.data as Map)['blocked_user_id'];
+              return handler.resolve(
+                Response(
+                  requestOptions: options,
+                  statusCode: 201,
+                  data: {
+                    'data': {'id': 'b-1', 'blocked_user_id': blockedUserId},
+                    'meta': null,
+                    'error': null,
+                  },
+                ),
+              );
+            }
+            return handler.next(options);
+          },
+        ),
+      );
+
+      final apiClient = ApiClient(tokenStorage: TokenStorage(), customDio: dio);
+
+      final router = GoRouter(
+        initialLocation: AppRoutes.matchFoundPath,
+        routes: [
+          GoRoute(
+            path: AppRoutes.matchFoundPath,
+            builder: (context, state) =>
+                const MatchFoundScreen(podId: 'pod-reject-2'),
+          ),
+          GoRoute(
+            path: AppRoutes.matchingPrefsPath,
+            builder: (context, state) => const Scaffold(
+              body: Text('Matching Preferences Screen'),
+            ),
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWithValue(apiClient),
+          ],
+          child: MaterialApp.router(
+            theme: AppTheme.lightTheme,
+            routerConfig: router,
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Reject Suggestion'));
+      await tester.tap(find.text('Reject Suggestion'));
+      await tester.pumpAndSettle();
+
+      // Check the block checkbox
+      await tester.tap(find.text("Don't suggest this user again (block)"));
+      await tester.pumpAndSettle();
+
+      // Tap confirm
+      await tester.tap(find.widgetWithText(FilledButton, 'Reject Suggestion'));
+      await tester.pumpAndSettle();
+
+      expect(blockCalled, isTrue);
+      expect(blockedUserId, equals('partner-block-me'));
+      expect(find.text('Matching Preferences Screen'), findsOneWidget);
+    });
   });
 }

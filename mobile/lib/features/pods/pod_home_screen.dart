@@ -12,6 +12,7 @@ import '../todos/widgets/add_edit_todo_modal.dart';
 import '../checkins/streak_provider.dart';
 import '../checkins/widgets/daily_checkin_card.dart';
 import '../checkins/widgets/streak_badge.dart';
+import 'models/pod_model.dart';
 import 'pod_state.dart';
 
 class PodHomeScreen extends ConsumerStatefulWidget {
@@ -27,12 +28,132 @@ class PodHomeScreen extends ConsumerStatefulWidget {
 }
 
 class _PodHomeScreenState extends ConsumerState<PodHomeScreen> {
+  bool _isRejecting = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadData();
     });
+  }
+
+  Future<void> _handleRejectSuggestion(
+    String targetPodId,
+    PodMemberDetail? partner,
+  ) async {
+    if (targetPodId.isEmpty) return;
+
+    bool blockPartner = false;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Reject Suggestion?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Are you sure you want to decline this accountability partner suggestion with ${partner?.user.name.isNotEmpty == true ? partner!.user.name : "this partner"}?',
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'This pod will be dissolved and you can search for a different partner.',
+                style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+              if (partner != null && partner.user.id.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.md),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  value: blockPartner,
+                  onChanged: (val) {
+                    setDialogState(() {
+                      blockPartner = val ?? false;
+                    });
+                  },
+                  title: const Text(
+                    "Don't suggest this user again (block)",
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                  ),
+                  controlAffinity: ListTileControlAffinity.leading,
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(false),
+              child: const Text('Keep Match'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(ctx).colorScheme.error,
+                foregroundColor: Theme.of(ctx).colorScheme.onError,
+              ),
+              onPressed: () => Navigator.of(dialogCtx).pop(true),
+              child: const Text('Reject Suggestion'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _isRejecting = true;
+    });
+
+    final apiClient = ref.read(apiClientProvider);
+
+    try {
+      if (blockPartner && partner != null && partner.user.id.isNotEmpty) {
+        await apiClient.post<Map<String, dynamic>>(
+          '/blocks',
+          data: {'blocked_user_id': partner.user.id},
+        );
+      } else {
+        await apiClient.post<Map<String, dynamic>>('/pods/$targetPodId/leave');
+      }
+
+      ref.read(activePodDetailProvider.notifier).clearPod();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Match suggestion rejected. Let’s find a new partner!'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      context.go(AppRoutes.goalCategoryPath);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isRejecting = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isRejecting = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Failed to reject match suggestion.'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    }
   }
 
   Future<void> _loadData() async {
@@ -290,6 +411,34 @@ class _PodHomeScreenState extends ConsumerState<PodHomeScreen> {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      const Divider(height: 1),
+                      const SizedBox(height: AppSpacing.xs),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton.icon(
+                            onPressed: _isRejecting
+                                ? null
+                                : () => _handleRejectSuggestion(
+                                      resolvedPodId,
+                                      partner,
+                                    ),
+                            icon: Icon(
+                              Icons.person_remove_outlined,
+                              size: 16,
+                              color: theme.colorScheme.error,
+                            ),
+                            label: Text(
+                              'Reject Suggestion / Change Partner',
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                color: theme.colorScheme.error,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                         ],
