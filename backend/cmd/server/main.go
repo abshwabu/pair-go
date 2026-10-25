@@ -86,7 +86,7 @@ func main() {
 
 	// 4. Initialize matching worker and start background processing
 	matchingRepo := matching.NewRepository(database.Write, database.Read)
-	matchingWorker := matching.NewWorker(matchingRepo)
+	matchingWorker := matching.NewWorker(matchingRepo, matching.WithProposalTTL(cfg.ProposalTTL))
 	workerCtx, workerCancel := context.WithCancel(context.Background())
 	defer workerCancel()
 	go matchingWorker.Start(workerCtx)

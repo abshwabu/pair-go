@@ -14,6 +14,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/abshwabu/pair/backend/internal/auth"
 	"github.com/abshwabu/pair/backend/internal/chat"
 	"github.com/abshwabu/pair/backend/internal/config"
 	"github.com/abshwabu/pair/backend/internal/db"
@@ -295,13 +296,22 @@ func TestNotifications_Trigger_StreakBroken(t *testing.T) {
 }
 
 func TestNotifications_Trigger_MatchFound(t *testing.T) {
-	_, database, _, worker := setupNotificationsTestApp(t)
+	router, database, _, worker := setupNotificationsTestApp(t)
 
 	u1ID := uuid.NewString()
 	u2ID := uuid.NewString()
 	now := time.Now().UTC().Format(time.RFC3339)
 	_, _ = database.Write.Exec(`INSERT INTO users (id, name, email, password_hash, timezone, language, is_admin, created_at, updated_at) VALUES (?, 'Match A', 'ma@example.com', 'h', 'America/New_York', 'en', 0, ?, ?);`, u1ID, now, now)
 	_, _ = database.Write.Exec(`INSERT INTO users (id, name, email, password_hash, timezone, language, is_admin, created_at, updated_at) VALUES (?, 'Match B', 'mb@example.com', 'h', 'America/New_York', 'en', 0, ?, ?);`, u2ID, now, now)
+
+	tok1 := "tok1_secret"
+	tok2 := "tok2_secret"
+	if _, err := database.Write.Exec(`INSERT INTO auth_tokens (id, user_id, token_hash, created_at) VALUES (?, ?, ?, ?);`, uuid.NewString(), u1ID, auth.HashToken(tok1), now); err != nil {
+		t.Fatalf("failed to insert auth_token for u1: %v", err)
+	}
+	if _, err := database.Write.Exec(`INSERT INTO auth_tokens (id, user_id, token_hash, created_at) VALUES (?, ?, ?, ?);`, uuid.NewString(), u2ID, auth.HashToken(tok2), now); err != nil {
+		t.Fatalf("failed to insert auth_token for u2: %v", err)
+	}
 
 	goal1ID := uuid.NewString()
 	goal2ID := uuid.NewString()
@@ -321,15 +331,53 @@ func TestNotifications_Trigger_MatchFound(t *testing.T) {
 
 	notifRepo := notifications.NewRepository(database.Write, database.Read)
 
-	// Verify both users received match_found notification
+	// Verify both users received match_proposed notification
 	notifsA, _, _ := notifRepo.ListByUserID(context.Background(), u1ID, nil, 10)
-	if len(notifsA) != 1 || notifsA[0].Type != "match_found" {
-		t.Fatalf("expected match_found for user A, got %+v", notifsA)
+	if len(notifsA) != 1 || notifsA[0].Type != "match_proposed" {
+		t.Fatalf("expected match_proposed for user A, got %+v", notifsA)
 	}
 
 	notifsB, _, _ := notifRepo.ListByUserID(context.Background(), u2ID, nil, 10)
-	if len(notifsB) != 1 || notifsB[0].Type != "match_found" {
-		t.Fatalf("expected match_found for user B, got %+v", notifsB)
+	if len(notifsB) != 1 || notifsB[0].Type != "match_proposed" {
+		t.Fatalf("expected match_proposed for user B, got %+v", notifsB)
+	}
+
+	var pPayload map[string]any
+	if err := json.Unmarshal([]byte(notifsA[0].Payload), &pPayload); err != nil {
+		t.Fatalf("failed to unmarshal proposal notification payload: %v", err)
+	}
+	proposalID, ok := pPayload["proposal_id"].(string)
+	if !ok || proposalID == "" {
+		t.Fatalf("missing proposal_id in notification payload: %+v", pPayload)
+	}
+
+	// User 1 accepts
+	reqAccept1 := httptest.NewRequest(http.MethodPost, "/api/v1/matching/proposals/"+proposalID+"/accept", nil)
+	reqAccept1.Header.Set("Authorization", "Bearer "+tok1)
+	recAccept1 := httptest.NewRecorder()
+	router.ServeHTTP(recAccept1, reqAccept1)
+	if recAccept1.Code != http.StatusOK {
+		t.Fatalf("expected 200 on u1 accept, got %d: %s", recAccept1.Code, recAccept1.Body.String())
+	}
+
+	// User 2 accepts
+	reqAccept2 := httptest.NewRequest(http.MethodPost, "/api/v1/matching/proposals/"+proposalID+"/accept", nil)
+	reqAccept2.Header.Set("Authorization", "Bearer "+tok2)
+	recAccept2 := httptest.NewRecorder()
+	router.ServeHTTP(recAccept2, reqAccept2)
+	if recAccept2.Code != http.StatusOK {
+		t.Fatalf("expected 200 on u2 accept, got %d: %s", recAccept2.Code, recAccept2.Body.String())
+	}
+
+	// Now both should have received match_confirmed (newest first, so index 0)
+	notifsA2, _, _ := notifRepo.ListByUserID(context.Background(), u1ID, nil, 10)
+	if len(notifsA2) != 2 || notifsA2[0].Type != "match_confirmed" {
+		t.Fatalf("expected match_confirmed for user A, got %+v", notifsA2)
+	}
+
+	notifsB2, _, _ := notifRepo.ListByUserID(context.Background(), u2ID, nil, 10)
+	if len(notifsB2) != 2 || notifsB2[0].Type != "match_confirmed" {
+		t.Fatalf("expected match_confirmed for user B, got %+v", notifsB2)
 	}
 }
 

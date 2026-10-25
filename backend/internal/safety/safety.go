@@ -319,7 +319,37 @@ func (r *Repository) CreateBlock(ctx context.Context, userID, blockedUserID stri
 		return nil, nil, fmt.Errorf("failed to insert block: %w", err)
 	}
 
-	// 4. Find any shared active pods between userID and blockedUserID
+	// 4. Cancel any pending proposals between the two users and return both requests to open
+	propRows, err := tx.QueryContext(ctx, `
+		SELECT id, request_a_id, request_b_id
+		FROM match_proposals
+		WHERE status = 'pending'
+		  AND ((user_a_id = ? AND user_b_id = ?) OR (user_a_id = ? AND user_b_id = ?));
+	`, userID, blockedUserID, blockedUserID, userID)
+	if err == nil {
+		type propItem struct {
+			id, reqA, reqB string
+		}
+		var pendingProps []propItem
+		for propRows.Next() {
+			var it propItem
+			if err := propRows.Scan(&it.id, &it.reqA, &it.reqB); err == nil {
+				pendingProps = append(pendingProps, it)
+			}
+		}
+		propRows.Close()
+
+		for _, p := range pendingProps {
+			_, _ = tx.ExecContext(ctx, `
+				UPDATE match_proposals SET status = 'cancelled', updated_at = ? WHERE id = ?;
+			`, createdAtStr, p.id)
+			_, _ = tx.ExecContext(ctx, `
+				UPDATE pod_requests SET status = 'open', proposal_id = NULL, updated_at = ? WHERE id IN (?, ?);
+			`, createdAtStr, p.reqA, p.reqB)
+		}
+	}
+
+	// 5. Find any shared active pods between userID and blockedUserID
 	sharedQuery := `
 		SELECT p.id
 		FROM pods p

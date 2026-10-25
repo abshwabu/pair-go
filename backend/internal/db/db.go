@@ -140,6 +140,18 @@ func RunMigrations(db *sql.DB) error {
 	if err := goose.Up(db, "."); err != nil {
 		return fmt.Errorf("goose up: %w", err)
 	}
+
+	fkRows, err := db.Query("PRAGMA foreign_key_check;")
+	if err != nil {
+		return fmt.Errorf("foreign_key_check query: %w", err)
+	}
+	defer fkRows.Close()
+	if fkRows.Next() {
+		var table, rowid, parent, fkid string
+		_ = fkRows.Scan(&table, &rowid, &parent, &fkid)
+		return fmt.Errorf("foreign key check failed on table %s, row %s, parent %s", table, rowid, parent)
+	}
+
 	return nil
 }
 

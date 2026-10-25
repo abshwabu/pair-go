@@ -28,6 +28,9 @@ type Config struct {
 	// Firebase Cloud Messaging
 	FCMCredentialsJSON string
 	FCMProjectID       string
+
+	// Matching Proposal TTL
+	ProposalTTL time.Duration
 }
 
 // TokenExpiryDuration returns the duration of token validity.
@@ -51,6 +54,7 @@ func Load() (*Config, error) {
 		S3PublicBaseURL:    getEnv("S3_PUBLIC_BASE_URL", "http://localhost:9000/pair-media"),
 		FCMCredentialsJSON: getEnv("FCM_CREDENTIALS_JSON", ""),
 		FCMProjectID:       getEnv("FCM_PROJECT_ID", ""),
+		ProposalTTL:        getEnvDuration("PROPOSAL_TTL", 12*time.Hour),
 	}
 
 	if cfg.Port == "" {
@@ -82,6 +86,15 @@ func getEnvInt(key string, defaultVal int) int {
 func getEnvBool(key string, defaultVal bool) bool {
 	if val, ok := os.LookupEnv(key); ok && val != "" {
 		if parsed, err := strconv.ParseBool(val); err == nil {
+			return parsed
+		}
+	}
+	return defaultVal
+}
+
+func getEnvDuration(key string, defaultVal time.Duration) time.Duration {
+	if val, ok := os.LookupEnv(key); ok && val != "" {
+		if parsed, err := time.ParseDuration(val); err == nil {
 			return parsed
 		}
 	}

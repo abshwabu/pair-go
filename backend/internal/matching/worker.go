@@ -19,6 +19,27 @@ func WithSweepInterval(d time.Duration) WorkerOption {
 	}
 }
 
+// WithProposalSweepInterval sets the proposal expiry sweep interval.
+func WithProposalSweepInterval(d time.Duration) WorkerOption {
+	return func(w *Worker) {
+		w.proposalSweepInterval = d
+	}
+}
+
+// WithProposalTTL sets the time-to-live for match proposals.
+func WithProposalTTL(d time.Duration) WorkerOption {
+	return func(w *Worker) {
+		w.proposalTTL = d
+	}
+}
+
+// WithClock sets the clock used by the worker.
+func WithClock(c Clock) WorkerOption {
+	return func(w *Worker) {
+		w.clock = c
+	}
+}
+
 // WithOlderThan sets the age threshold for retrying open requests in the sweep.
 func WithOlderThan(d time.Duration) WorkerOption {
 	return func(w *Worker) {
@@ -38,7 +59,7 @@ type Notifier interface {
 	Send(ctx context.Context, userID, notificationType string, payload map[string]any) error
 }
 
-// WithNotifier configures a notifier for emitting notifications on match found.
+// WithNotifier configures a notifier for emitting notifications.
 func WithNotifier(n Notifier) WorkerOption {
 	return func(w *Worker) {
 		w.notifier = n
@@ -47,22 +68,28 @@ func WithNotifier(n Notifier) WorkerOption {
 
 // Worker is an in-process background worker that processes match requests.
 type Worker struct {
-	repo          *Repository
-	notifier      Notifier
-	requestChan   chan string
-	sweepInterval time.Duration
-	olderThan     time.Duration
-	mu            sync.Mutex
-	running       bool
+	repo                  *Repository
+	notifier              Notifier
+	requestChan           chan string
+	sweepInterval         time.Duration
+	proposalSweepInterval time.Duration
+	olderThan             time.Duration
+	proposalTTL           time.Duration
+	clock                 Clock
+	mu                    sync.Mutex
+	running               bool
 }
 
 // NewWorker initializes a new matching Worker.
 func NewWorker(repo *Repository, opts ...WorkerOption) *Worker {
 	w := &Worker{
-		repo:          repo,
-		requestChan:   make(chan string, 256),
-		sweepInterval: 5 * time.Minute,
-		olderThan:     2 * time.Minute,
+		repo:                  repo,
+		requestChan:           make(chan string, 256),
+		sweepInterval:         5 * time.Minute,
+		proposalSweepInterval: 1 * time.Minute,
+		olderThan:             2 * time.Minute,
+		proposalTTL:           12 * time.Hour,
+		clock:                 repo.Clock(),
 	}
 	for _, opt := range opts {
 		opt(w)
@@ -75,6 +102,10 @@ func (w *Worker) SetNotifier(n Notifier) {
 	w.notifier = n
 }
 
+// SetProposalTTL sets the TTL for match proposals.
+func (w *Worker) SetProposalTTL(ttl time.Duration) {
+	w.proposalTTL = ttl
+}
 
 // Enqueue sends a request ID to the worker's buffered channel without blocking.
 func (w *Worker) Enqueue(requestID string) {
@@ -88,7 +119,7 @@ func (w *Worker) Enqueue(requestID string) {
 	}
 }
 
-// Start begins processing matching requests and the sweep ticker until context cancellation.
+// Start begins processing matching requests and the sweep tickers until context cancellation.
 func (w *Worker) Start(ctx context.Context) {
 	w.mu.Lock()
 	if w.running {
@@ -104,10 +135,18 @@ func (w *Worker) Start(ctx context.Context) {
 		w.mu.Unlock()
 	}()
 
-	ticker := time.NewTicker(w.sweepInterval)
-	defer ticker.Stop()
+	sweepTicker := time.NewTicker(w.sweepInterval)
+	defer sweepTicker.Stop()
 
-	slog.Info("Matching worker started", "sweep_interval", w.sweepInterval, "older_than", w.olderThan)
+	propSweepTicker := time.NewTicker(w.proposalSweepInterval)
+	defer propSweepTicker.Stop()
+
+	slog.Info("Matching worker started",
+		"sweep_interval", w.sweepInterval,
+		"proposal_sweep_interval", w.proposalSweepInterval,
+		"older_than", w.olderThan,
+		"proposal_ttl", w.proposalTTL,
+	)
 
 	for {
 		select {
@@ -118,7 +157,11 @@ func (w *Worker) Start(ctx context.Context) {
 			if err := w.ProcessRequest(ctx, reqID); err != nil && !errors.Is(err, context.Canceled) {
 				slog.Debug("process request result", "request_id", reqID, "error", err)
 			}
-		case <-ticker.C:
+		case <-propSweepTicker.C:
+			if err := w.SweepExpiredProposals(ctx); err != nil && !errors.Is(err, context.Canceled) {
+				slog.Error("error during proposal expiry sweep", "error", err)
+			}
+		case <-sweepTicker.C:
 			if err := w.Sweep(ctx); err != nil && !errors.Is(err, context.Canceled) {
 				slog.Error("error during matching sweep", "error", err)
 			}
@@ -131,7 +174,7 @@ type candidateScore struct {
 	score     int
 }
 
-// ProcessRequest evaluates potential matches for a given request and pairs with the best match.
+// ProcessRequest evaluates potential matches for a given request and proposes a match.
 func (w *Worker) ProcessRequest(ctx context.Context, requestID string) error {
 	// 1. Fetch current request details
 	req, err := w.repo.GetRequestDetails(ctx, requestID)
@@ -151,7 +194,7 @@ func (w *Worker) ProcessRequest(ctx context.Context, requestID string) error {
 		return nil
 	}
 
-	// 3. Find candidates (filtered by category, language, non-blocked)
+	// 3. Find candidates (filtered by category, language, non-blocked, non-rejected)
 	candidates, err := w.repo.FindCandidateRequests(ctx, req)
 	if err != nil {
 		return err
@@ -184,28 +227,27 @@ func (w *Worker) ProcessRequest(ctx context.Context, requestID string) error {
 		return scoredCandidates[i].candidate.CreatedAt.Before(scoredCandidates[j].candidate.CreatedAt)
 	})
 
-	// 6. Attempt pairing in descending score order
+	// 6. Attempt proposing in descending score order
 	for _, item := range scoredCandidates {
-		podID, err := w.repo.PairRequests(ctx, req, item.candidate)
+		proposalID, err := w.repo.Propose(ctx, req, item.candidate, w.proposalTTL)
 		if err == nil {
-			slog.Info("Matched users into new pod",
-				"pod_id", podID,
+			slog.Info("Created match proposal for users",
+				"proposal_id", proposalID,
 				"req_a", req.ID, "user_a", req.UserID,
 				"req_b", item.candidate.ID, "user_b", item.candidate.UserID,
 				"score", item.score,
 			)
 			if w.notifier != nil {
 				payload := map[string]any{
-					"type":   "match_found",
-					"pod_id": podID,
-					"title":  "Match Found!",
-					"body":   "You've been paired with an accountability partner!",
+					"type":        "match_proposed",
+					"proposal_id": proposalID,
+					"title":       "We found you a partner",
+					"body":        "Tap to see your match",
 				}
-				_ = w.notifier.Send(ctx, req.UserID, "match_found", payload)
-				_ = w.notifier.Send(ctx, item.candidate.UserID, "match_found", payload)
+				_ = w.notifier.Send(ctx, req.UserID, "match_proposed", payload)
+				_ = w.notifier.Send(ctx, item.candidate.UserID, "match_proposed", payload)
 			}
 			return nil
-
 		}
 		if errors.Is(err, ErrPairingConflict) {
 			// One of the requests was no longer open or active pod conflict; continue to next candidate
@@ -217,9 +259,39 @@ func (w *Worker) ProcessRequest(ctx context.Context, requestID string) error {
 	return nil
 }
 
+// SweepExpiredProposals checks for expired proposals, transitions them, and handles reopen/cancel and notifications.
+func (w *Worker) SweepExpiredProposals(ctx context.Context) error {
+	actions, err := w.repo.ExpirePendingProposals(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, act := range actions {
+		for _, reqID := range act.ReopenedReqs {
+			w.Enqueue(reqID)
+		}
+		if w.notifier != nil {
+			for _, uID := range act.NotifUsers {
+				payload := map[string]any{
+					"type":  "match_declined",
+					"title": "Still looking",
+					"body":  "Your match didn't respond in time, we're finding you someone new",
+				}
+				_ = w.notifier.Send(ctx, uID, "match_declined", payload)
+			}
+		}
+	}
+
+	return nil
+}
+
 // Sweep checks for open requests older than the configured threshold and retries matching.
 func (w *Worker) Sweep(ctx context.Context) error {
-	cutoff := time.Now().UTC().Add(-w.olderThan)
+	// 1. Run proposal expiry first
+	_ = w.SweepExpiredProposals(ctx)
+
+	// 2. Retry open requests
+	cutoff := w.clock.Now().UTC().Add(-w.olderThan)
 	olderReqs, err := w.repo.GetOpenRequestsOlderThan(ctx, cutoff)
 	if err != nil {
 		return err

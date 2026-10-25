@@ -79,11 +79,18 @@ func NewRouterWithWorker(cfg *config.Config, database *db.DB, storageService sto
 	goalsRepo := goals.NewRepository(database.Write, database.Read)
 	goalsHandler := goals.NewHandler(goalsRepo)
 
+	notificationsRepo := notifications.NewRepository(database.Write, database.Read)
+	notificationsService := notifications.NewService(notificationsRepo, database.Read)
+	notificationsHandler := notifications.NewHandler(notificationsRepo)
+
 	matchingRepo := matching.NewRepository(database.Write, database.Read)
 	if worker == nil {
 		worker = matching.NewWorker(matchingRepo)
 	}
-	matchingHandler := matching.NewHandler(matchingRepo, goalsRepo, worker)
+	if worker != nil {
+		worker.SetNotifier(notificationsService)
+	}
+	matchingHandler := matching.NewHandler(matchingRepo, goalsRepo, usersRepo, worker, notificationsService)
 
 	todosRepo := todos.NewRepository(database.Write, database.Read)
 	todosHandler := todos.NewHandler(todosRepo)
@@ -98,13 +105,6 @@ func NewRouterWithWorker(cfg *config.Config, database *db.DB, storageService sto
 	safetyRepo := safety.NewRepository(database.Write, database.Read)
 	safetyHandler := safety.NewHandler(safetyRepo, podsRepo, chatHub)
 
-	notificationsRepo := notifications.NewRepository(database.Write, database.Read)
-	notificationsService := notifications.NewService(notificationsRepo, database.Read)
-	notificationsHandler := notifications.NewHandler(notificationsRepo)
-
-	if worker != nil {
-		worker.SetNotifier(notificationsService)
-	}
 	chatHandler.SetNotifier(notificationsService, podsRepo)
 	chatHandler.SetStorageService(storageService)
 	checkinsHandler.SetNotifier(notificationsService)

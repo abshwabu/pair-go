@@ -65,6 +65,7 @@ func TestOpenAndMigrations(t *testing.T) {
 		"reports",
 		"blocks",
 		"notifications",
+		"match_proposals",
 	}
 
 	for _, tbl := range expectedTables {
