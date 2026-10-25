@@ -50,9 +50,11 @@ void main() {
 
     test('Typography styles define expected sizes and weights', () {
       expect(AppTypography.displayLarge.fontSize, 32.0);
-      expect(AppTypography.headlineMedium.fontSize, 20.0);
+      expect(AppTypography.headlineLarge.fontSize, 24.0);
+      expect(AppTypography.titleLarge.fontSize, 20.0);
       expect(AppTypography.bodyLarge.fontSize, 16.0);
-      expect(AppTypography.bodySmall.fontSize, 12.0);
+      expect(AppTypography.bodySmall.fontSize, 14.0);
+      expect(AppTypography.labelLarge.fontSize, 14.0);
     });
   });
 }

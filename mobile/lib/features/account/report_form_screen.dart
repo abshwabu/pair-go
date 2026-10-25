@@ -73,29 +73,32 @@ class _ReportFormScreenState extends ConsumerState<ReportFormScreen> {
       await showDialog<void>(
         context: context,
         barrierDismissible: false,
-        builder: (dialogCtx) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.check_circle_outline_rounded, color: Colors.green),
-              SizedBox(width: 8),
-              Text('Report Submitted'),
-            ],
-          ),
-          content: const Text(
-            'Thank you for reporting this issue. Our moderation team reviews every report carefully to maintain accountability and safety.',
-          ),
-          actions: [
-            FilledButton(
-              onPressed: () {
-                Navigator.of(dialogCtx).pop();
-                if (mounted) {
-                  context.pop();
-                }
-              },
-              child: const Text('Done'),
+        builder: (dialogCtx) {
+          final theme = Theme.of(dialogCtx);
+          return AlertDialog(
+            title: Row(
+              children: [
+                Icon(Icons.check_circle_outline_rounded, color: theme.colorScheme.primary),
+                const SizedBox(width: AppSpacing.sm),
+                const Text('Report Submitted'),
+              ],
             ),
-          ],
-        ),
+            content: const Text(
+              'Thank you for reporting this issue. Our moderation team reviews every report carefully to maintain accountability and safety.',
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () {
+                  Navigator.of(dialogCtx).pop();
+                  if (mounted) {
+                    context.pop();
+                  }
+                },
+                child: const Text('Done'),
+              ),
+            ],
+          );
+        },
       );
     } on ApiException catch (e) {
       if (mounted) {

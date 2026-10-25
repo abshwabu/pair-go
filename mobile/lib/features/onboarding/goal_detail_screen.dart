@@ -1,45 +1,100 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/network/api_client.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_radii.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_typography.dart';
+import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_text_field.dart';
 import '../../core/widgets/error_banner.dart';
+import '../../core/widgets/onboarding_step_header.dart';
 import 'goal_category_provider.dart';
 import 'goal_detail_provider.dart';
 
 class GoalDetailScreen extends ConsumerWidget {
   const GoalDetailScreen({super.key});
 
+  String _getPromptTitle(String category) {
+    switch (category.toLowerCase()) {
+      case 'read':
+        return 'What are you going to read?';
+      case 'watch':
+        return 'What are you planning to watch?';
+      case 'fitness':
+        return 'What are you training for?';
+      case 'habit':
+        return 'What habit are you building?';
+      default:
+        return 'Define your goal';
+    }
+  }
+
+  String _getPaceDescription(String pace) {
+    switch (pace.toLowerCase()) {
+      case 'relaxed':
+        return '1–2 check-ins a week • Low pressure, flexible pace';
+      case 'intense':
+        return 'Daily check-ins • High accountability & rapid momentum';
+      case 'steady':
+      default:
+        return '3–5 check-ins a week • Balanced, consistent progress';
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final category = ref.watch(selectedGoalCategoryProvider) ?? 'custom';
     final state = ref.watch(goalDetailNotifierProvider);
     final notifier = ref.read(goalDetailNotifierProvider.notifier);
+
+    void submit() {
+      HapticFeedback.lightImpact();
+      notifier.submit(
+        apiClient: ref.read(apiClientProvider),
+        context: context,
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Goal Details'),
       ),
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpacing.lg),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.sm,
+          ),
+          child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 480),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  OnboardingStepHeader(
+                    currentStep: 3,
+                    totalSteps: 4,
+                    onBack: () => context.pop(),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
                   Text(
-                    'Define your goal',
-                    style: theme.textTheme.headlineLarge,
+                    _getPromptTitle(category),
+                    style: AppTypography.headlineLarge.copyWith(
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.w700,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
                     'Your accountability partner will see this to track progress with you.',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -47,79 +102,86 @@ class GoalDetailScreen extends ConsumerWidget {
 
                   // Category Badge
                   Center(
-                    child: Chip(
-                      avatar: Icon(
-                        Icons.category_outlined,
-                        size: 18,
-                        color: theme.colorScheme.primary,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                        vertical: AppSpacing.xs,
                       ),
-                      label: Text(
-                        'Category: ${category.toUpperCase()}',
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.primary,
-                        ),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primaryContainer,
+                        borderRadius: AppRadius.borderRadiusFull,
                       ),
-                      backgroundColor: theme.colorScheme.primaryContainer,
-                      side: BorderSide.none,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.category_outlined,
+                            size: 16,
+                            color: colorScheme.primary,
+                          ),
+                          const SizedBox(width: AppSpacing.xs),
+                          Text(
+                            'Category: ${category.toUpperCase()}',
+                            style: AppTypography.labelMedium.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: colorScheme.primary,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.lg),
 
                   // Error Banner
-                  if (state.errorMessage != null)
+                  if (state.errorMessage != null) ...[
                     ErrorBanner(
                       message: state.errorMessage,
                       onDismiss: notifier.clearErrorMessage,
                     ),
+                    const SizedBox(height: AppSpacing.md),
+                  ],
 
                   // Title Field
-                  TextFormField(
+                  AppTextField(
                     initialValue: state.title,
+                    label: 'Goal Title',
+                    hint: 'e.g. Run 5k Daily',
+                    prefixIcon: Icons.flag_outlined,
                     textInputAction: TextInputAction.next,
-                    textCapitalization: TextCapitalization.sentences,
-                    maxLength: 120,
-                    decoration: InputDecoration(
-                      labelText: 'Goal Title',
-                      hintText: 'e.g. Read Clean Architecture',
-                      prefixIcon: const Icon(Icons.flag_outlined),
-                      errorText: state.titleError,
-                    ),
+                    error: state.titleError,
                     onChanged: notifier.setTitle,
                     enabled: !state.isLoading,
                   ),
                   const SizedBox(height: AppSpacing.md),
 
                   // Target Description Field
-                  TextFormField(
+                  AppTextField(
                     initialValue: state.targetDescription,
-                    minLines: 3,
-                    maxLines: 5,
+                    label: 'Target Description',
+                    hint:
+                        'Describe what you plan to accomplish (e.g. 25 pages daily, finish in 3 weeks)',
+                    prefixIcon: Icons.notes_rounded,
+                    maxLines: 4,
                     textInputAction: TextInputAction.newline,
-                    textCapitalization: TextCapitalization.sentences,
-                    decoration: const InputDecoration(
-                      labelText: 'Target Description',
-                      hintText:
-                          'Describe what you plan to accomplish (e.g. 25 pages daily, finish in 3 weeks)',
-                      alignLabelWithHint: true,
-                    ),
                     onChanged: notifier.setTargetDescription,
                     enabled: !state.isLoading,
                   ),
                   const SizedBox(height: AppSpacing.lg),
 
-                  // Pace Segmented Button
+                  // Pace Section
                   Text(
                     'Target Pace',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
+                    style: AppTypography.titleMedium.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.onSurface,
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.xs),
+                  const SizedBox(height: AppSpacing.xxs),
                   Text(
                     'How aggressively do you want to pursue this goal?',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                    style: AppTypography.bodySmall.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                     ),
                   ),
                   const SizedBox(height: AppSpacing.sm),
@@ -145,29 +207,25 @@ class GoalDetailScreen extends ConsumerWidget {
                     onSelectionChanged: state.isLoading
                         ? null
                         : (Set<String> newSelection) {
+                            HapticFeedback.lightImpact();
                             notifier.setPace(newSelection.first);
                           },
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    _getPaceDescription(state.pace),
+                    style: AppTypography.bodySmall.copyWith(
+                      color: colorScheme.primary,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                   const SizedBox(height: AppSpacing.xl),
 
                   // Submit Button
-                  ElevatedButton(
-                    onPressed: state.isLoading
-                        ? null
-                        : () => notifier.submit(
-                              apiClient: ref.read(apiClientProvider),
-                              context: context,
-                            ),
-                    child: state.isLoading
-                        ? SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: theme.colorScheme.onPrimary,
-                            ),
-                          )
-                        : const Text('Save & Continue to Matching'),
+                  AppButton.primary(
+                    label: 'Save & Continue to Matching',
+                    isLoading: state.isLoading,
+                    onPressed: state.isLoading ? null : submit,
                   ),
                 ],
               ),

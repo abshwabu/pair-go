@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -29,6 +30,7 @@ import '../features/account/blocked_users_screen.dart';
 import '../features/account/notification_settings_screen.dart';
 import '../features/account/profile_screen.dart';
 import '../features/account/report_form_screen.dart';
+import '../features/debug/design_gallery_screen.dart';
 
 /// String constants for all route names and paths.
 class AppRoutes {
@@ -59,6 +61,7 @@ class AppRoutes {
   static const String blockedUsers = 'blocked-users';
   static const String reportForm = 'report-form';
   static const String accountSettings = 'account-settings';
+  static const String designGallery = 'design-gallery';
 
   static const String splashPath = '/splash';
   static const String loginPath = '/login';
@@ -85,6 +88,7 @@ class AppRoutes {
   static const String blockedUsersPath = '/blocked-users';
   static const String reportFormPath = '/report-form';
   static const String accountSettingsPath = '/account-settings';
+  static const String designGalleryPath = '/design-gallery';
 
   static const List<String> allRouteNames = [
     splash,
@@ -413,6 +417,12 @@ GoRouter createRouter({
         path: AppRoutes.accountSettingsPath,
         builder: (context, state) => const AccountSettingsScreen(),
       ),
+      if (kDebugMode)
+        GoRoute(
+          name: AppRoutes.designGallery,
+          path: AppRoutes.designGalleryPath,
+          builder: (context, state) => const DesignGalleryScreen(),
+        ),
     ],
   );
 }

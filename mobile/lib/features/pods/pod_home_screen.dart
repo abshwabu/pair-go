@@ -198,23 +198,25 @@ class _PodHomeScreenState extends ConsumerState<PodHomeScreen> {
           elevation: 0,
         ),
         body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ErrorBanner(message: podState.errorMessage!),
-                const SizedBox(height: AppSpacing.lg),
-                FilledButton(
-                  onPressed: _loadData,
-                  child: const Text('Retry'),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                TextButton(
-                  onPressed: () => context.go(AppRoutes.goalCategoryPath),
-                  child: const Text('Find a New Match'),
-                ),
-              ],
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ErrorBanner(message: podState.errorMessage!),
+                  const SizedBox(height: AppSpacing.lg),
+                  FilledButton(
+                    onPressed: _loadData,
+                    child: const Text('Retry'),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  TextButton(
+                    onPressed: () => context.go(AppRoutes.goalCategoryPath),
+                    child: const Text('Find a New Match'),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

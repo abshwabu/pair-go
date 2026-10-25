@@ -33,7 +33,7 @@ class StreakBadge extends ConsumerWidget {
     final bestStreak = streak?.bestStreak ?? fallbackBestStreak ?? 0;
 
     return Material(
-      color: Colors.transparent,
+      color: theme.colorScheme.surface.withValues(alpha: 0.0),
       child: InkWell(
         borderRadius: AppRadius.borderRadiusLg,
         onTap: () {

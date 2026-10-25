@@ -1,8 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
-import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_radii.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_typography.dart';
+import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_card.dart';
+import '../../core/widgets/dialog_helpers.dart';
 import '../../core/widgets/error_banner.dart';
+import '../../core/widgets/onboarding_step_header.dart';
 import 'matching_prefs_provider.dart';
 
 class MatchingPrefsScreen extends ConsumerWidget {
@@ -20,195 +28,276 @@ class MatchingPrefsScreen extends ConsumerWidget {
     {'code': 'pt', 'name': 'Portuguese (Português)'},
   ];
 
+  String _getToleranceLabel(int hours) {
+    if (hours == 0) return 'Exact match (same hour)';
+    if (hours == 12) return 'Anywhere in the world';
+    return 'Within $hours hours of me';
+  }
+
+  void _showLanguagePicker(
+    BuildContext context,
+    String currentLanguage,
+    MatchingPrefsNotifier notifier,
+  ) {
+    HapticFeedback.lightImpact();
+    showAppBottomSheet<void>(
+      context: context,
+      title: 'Select Language',
+      builder: (bottomSheetContext) {
+        final colorScheme = Theme.of(context).colorScheme;
+        return ListView(
+          shrinkWrap: true,
+          children: _availableLanguages.map((lang) {
+            final isSelected = lang['code'] == currentLanguage;
+            return ListTile(
+              title: Text(
+                lang['name']!,
+                style: AppTypography.bodyLarge.copyWith(
+                  fontWeight:
+                      isSelected ? FontWeight.w700 : FontWeight.normal,
+                ),
+              ),
+              trailing: isSelected
+                  ? Icon(
+                      Icons.check_circle_rounded,
+                      color: colorScheme.primary,
+                    )
+                  : null,
+              onTap: () {
+                HapticFeedback.lightImpact();
+                notifier.setLanguage(lang['code']!);
+                Navigator.of(context).pop();
+              },
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final state = ref.watch(matchingPrefsNotifierProvider);
     final notifier = ref.read(matchingPrefsNotifierProvider.notifier);
 
-    final currentLangCode = _availableLanguages
-            .any((l) => l['code'] == state.language)
-        ? state.language
-        : 'en';
+    final currentLangMap = _availableLanguages.firstWhere(
+      (l) => l['code'] == state.language,
+      orElse: () => {'code': 'en', 'name': 'English'},
+    );
+
+    void submit() {
+      HapticFeedback.lightImpact();
+      notifier.saveAndProceed(context);
+    }
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Matching Preferences'),
       ),
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpacing.lg),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.md,
+          ),
+          child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 480),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  OnboardingStepHeader(
+                    currentStep: 4,
+                    totalSteps: 4,
+                    onBack: () => context.pop(),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
                   Text(
                     'Partner Preferences',
-                    style: theme.textTheme.headlineLarge,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    'Set your availability tolerance and communication language to find the ideal accountability match.',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
+                          style: AppTypography.headlineLarge.copyWith(
+                            color: colorScheme.onSurface,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          'Set your availability tolerance and communication language to find the ideal accountability match.',
+                          style: AppTypography.bodyMedium.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: AppSpacing.xl),
 
-                  if (state.errorMessage != null)
-                    ErrorBanner(
-                      message: state.errorMessage,
-                      onDismiss: notifier.clearErrorMessage,
-                    ),
+                        if (state.errorMessage != null) ...[
+                          ErrorBanner(
+                            message: state.errorMessage,
+                            onDismiss: notifier.clearErrorMessage,
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                        ],
 
-                  // Timezone Tolerance Card
-                  Card(
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: AppRadius.borderRadiusMd,
-                      side: BorderSide(color: theme.dividerColor),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        // Timezone Tolerance Card
+                        AppCard(
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Timezone Tolerance',
+                                    style: AppTypography.titleMedium.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      color: colorScheme.onSurface,
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: AppSpacing.sm,
+                                      vertical: AppSpacing.xxs,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.primaryContainer,
+                                      borderRadius:
+                                          AppRadius.borderRadiusFull,
+                                    ),
+                                    child: Text(
+                                      state.timezoneToleranceHours == 0
+                                          ? 'Exact'
+                                          : '± ${state.timezoneToleranceHours}h',
+                                      style: AppTypography.labelSmall.copyWith(
+                                        fontWeight: FontWeight.w700,
+                                        color: colorScheme.primary,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: AppSpacing.xxs),
                               Text(
-                                'Timezone Tolerance',
-                                style: theme.textTheme.titleMedium?.copyWith(
+                                _getToleranceLabel(
+                                    state.timezoneToleranceHours),
+                                style: AppTypography.bodySmall.copyWith(
+                                  color: colorScheme.primary,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
-                              Container(
+                              const SizedBox(height: AppSpacing.md),
+                              Slider(
+                                value:
+                                    state.timezoneToleranceHours.toDouble(),
+                                min: 0,
+                                max: 12,
+                                divisions: 12,
+                                label:
+                                    '± ${state.timezoneToleranceHours}h',
+                                onChanged: (val) {
+                                  notifier.setTimezoneTolerance(val.round());
+                                },
+                              ),
+                              Padding(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: AppSpacing.sm,
-                                  vertical: AppSpacing.xxs,
+                                  horizontal: AppSpacing.xs,
                                 ),
-                                decoration: BoxDecoration(
-                                  color: theme.colorScheme.primaryContainer,
-                                  borderRadius: AppRadius.borderRadiusSm,
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      '0 hrs',
+                                      style: AppTypography.labelSmall.copyWith(
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                    Text(
+                                      '6 hrs',
+                                      style: AppTypography.labelSmall.copyWith(
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                    Text(
+                                      '12 hrs',
+                                      style: AppTypography.labelSmall.copyWith(
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                child: Text(
-                                  state.timezoneToleranceHours == 0
-                                      ? 'Same hour'
-                                      : '± ${state.timezoneToleranceHours} hrs',
-                                  style: theme.textTheme.labelMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: theme.colorScheme.primary,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+
+                        // Language Preference Card
+                        AppCard(
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Preferred Language',
+                                style: AppTypography.titleMedium.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: colorScheme.onSurface,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.xxs),
+                              Text(
+                                'Language for check-ins, messages, and accountability chat.',
+                                style: AppTypography.bodySmall.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              InkWell(
+                                onTap: state.isLoading
+                                    ? null
+                                    : () => _showLanguagePicker(
+                                          context,
+                                          state.language,
+                                          notifier,
+                                        ),
+                                borderRadius: AppRadius.borderRadiusInput,
+                                child: InputDecorator(
+                                  decoration: const InputDecoration(
+                                    prefixIcon:
+                                        Icon(Icons.language_rounded),
+                                    labelText: 'Language',
+                                    suffixIcon:
+                                        Icon(Icons.arrow_drop_down_rounded),
+                                  ),
+                                  child: Text(
+                                    currentLangMap['name']!,
+                                    style: AppTypography.bodyLarge.copyWith(
+                                      color: colorScheme.onSurface,
+                                    ),
                                   ),
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: AppSpacing.xs),
-                          Text(
-                            'Maximum hours difference between your timezone and your partner.',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.md),
-                          Slider(
-                            value: state.timezoneToleranceHours.toDouble(),
-                            min: 0,
-                            max: 12,
-                            divisions: 12,
-                            label: '± ${state.timezoneToleranceHours}h',
-                            onChanged: (val) {
-                              notifier.setTimezoneTolerance(val.round());
-                            },
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.xs,
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text('0 hrs', style: theme.textTheme.labelSmall),
-                                Text('6 hrs', style: theme.textTheme.labelSmall),
-                                Text('12 hrs',
-                                    style: theme.textTheme.labelSmall),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
+                        ),
+                        const SizedBox(height: AppSpacing.xl),
 
-                  // Language Preference Card
-                  Card(
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: AppRadius.borderRadiusMd,
-                      side: BorderSide(color: theme.dividerColor),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Preferred Language',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.xs),
-                          Text(
-                            'Language for check-ins, messages, and accountability chat.',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.md),
-                          DropdownButtonFormField<String>(
-                            initialValue: currentLangCode,
-                            isExpanded: true,
-                            decoration: const InputDecoration(
-                              prefixIcon: Icon(Icons.language_rounded),
-                              labelText: 'Language',
-                            ),
-                            items: _availableLanguages.map((lang) {
-                              return DropdownMenuItem<String>(
-                                value: lang['code'],
-                                child: Text(lang['name']!),
-                              );
-                            }).toList(),
-                            onChanged: (val) {
-                              if (val != null) {
-                                notifier.setLanguage(val);
-                              }
-                            },
-                          ),
-                        ],
-                      ),
+                        // Find Match Button
+                        AppButton.primary(
+                          label: 'Find Partner Match',
+                          isLoading: state.isLoading,
+                          onPressed: state.isLoading ? null : submit,
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.xl),
-
-                  // Find Match Button
-                  ElevatedButton(
-                    onPressed: state.isLoading
-                        ? null
-                        : () => notifier.saveAndProceed(context),
-                    child: const Text('Find Partner Match'),
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
-        ),
-      ),
     );
   }
 }

@@ -7,6 +7,7 @@ import '../../core/router.dart';
 import '../../core/storage/token_storage.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/error_banner.dart';
+import '../../core/widgets/theme_mode_selector.dart';
 import '../auth/auth_state.dart';
 
 class AccountSettingsScreen extends ConsumerStatefulWidget {
@@ -173,6 +174,48 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Appearance Section
+              Text(
+                'APPEARANCE',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.1,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Card(
+                elevation: 0,
+                color: theme.colorScheme.surfaceContainerHighest,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: AppRadius.borderRadiusMd,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'Theme Mode',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        'Choose between System, Light, or Dark theme appearance.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      const ThemeModeSelector(),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xl),
+
               // Change Password Section
               Text(
                 'SECURITY & CREDENTIALS',
@@ -220,17 +263,17 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
                           Container(
                             padding: const EdgeInsets.all(AppSpacing.md),
                             decoration: BoxDecoration(
-                              color: Colors.green.withValues(alpha: 0.1),
+                              color: context.tokens.success.withValues(alpha: 0.1),
                               borderRadius: AppRadius.borderRadiusSm,
                               border: Border.all(
-                                color: Colors.green.withValues(alpha: 0.3),
+                                color: context.tokens.success.withValues(alpha: 0.3),
                               ),
                             ),
                             child: Row(
                               children: [
-                                const Icon(
+                                Icon(
                                   Icons.check_circle_rounded,
-                                  color: Colors.green,
+                                  color: context.tokens.success,
                                   size: 20,
                                 ),
                                 const SizedBox(width: AppSpacing.sm),
@@ -238,7 +281,7 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
                                   child: Text(
                                     _passwordSuccess!,
                                     style: theme.textTheme.bodyMedium?.copyWith(
-                                      color: Colors.green.shade800,
+                                      color: context.tokens.success,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),

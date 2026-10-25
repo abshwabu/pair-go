@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/router.dart';
 import '../../core/storage/token_storage.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_radii.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_typography.dart';
+import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_text_field.dart';
 import '../../core/widgets/error_banner.dart';
 import 'signup_provider.dart';
 
@@ -17,12 +22,19 @@ class SignupScreen extends ConsumerStatefulWidget {
 }
 
 class _SignupScreenState extends ConsumerState<SignupScreen> {
-  bool _obscurePassword = true;
-  bool _obscureConfirm = true;
+  void _submit() {
+    HapticFeedback.lightImpact();
+    ref.read(signupNotifierProvider.notifier).submit(
+          apiClient: ref.read(apiClientProvider),
+          tokenStorage: ref.read(tokenStorageProvider),
+          context: context,
+        );
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final signupState = ref.watch(signupNotifierProvider);
     final signupNotifier = ref.read(signupNotifierProvider.notifier);
 
@@ -30,158 +42,124 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpacing.lg),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.xl,
+            ),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 400),
+              constraints: const BoxConstraints(maxWidth: 420),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Icon(
-                    Icons.person_add_outlined,
-                    size: 48,
-                    color: theme.colorScheme.primary,
+                  Center(
+                    child: Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: colorScheme.primaryContainer,
+                        borderRadius: AppRadius.borderRadiusLg,
+                      ),
+                      child: Icon(
+                        Icons.person_add_outlined,
+                        size: 32,
+                        color: colorScheme.primary,
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: AppSpacing.md),
+                  const SizedBox(height: AppSpacing.lg),
                   Text(
                     'Create an account',
-                    style: theme.textTheme.headlineLarge,
+                    style: AppTypography.headlineLarge.copyWith(
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.w700,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    'Join Pair to achieve your goals together',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                    'Find your accountability partner and achieve your goals.',
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                     ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: AppSpacing.xl),
 
                   // Error Banner
-                  if (signupState.errorMessage != null)
+                  if (signupState.errorMessage != null) ...[
                     ErrorBanner(
                       message: signupState.errorMessage,
                       onDismiss: signupNotifier.clearErrorMessage,
                     ),
+                    const SizedBox(height: AppSpacing.md),
+                  ],
 
-                  // Name Field
-                  TextFormField(
+                  // Full Name Field
+                  AppTextField(
                     initialValue: signupState.name,
+                    label: 'Full Name',
+                    hint: 'Jane Doe',
+                    prefixIcon: Icons.person_outline,
                     textInputAction: TextInputAction.next,
-                    textCapitalization: TextCapitalization.words,
-                    decoration: InputDecoration(
-                      labelText: 'Full Name',
-                      hintText: 'Jane Doe',
-                      prefixIcon: const Icon(Icons.person_outline),
-                      errorText: signupState.nameError,
-                    ),
+                    error: signupState.nameError,
                     onChanged: signupNotifier.setName,
                     enabled: !signupState.isLoading,
                   ),
                   const SizedBox(height: AppSpacing.md),
 
                   // Email Field
-                  TextFormField(
+                  AppTextField(
                     initialValue: signupState.email,
+                    label: 'Email',
+                    hint: 'jane@example.com',
+                    prefixIcon: Icons.email_outlined,
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.next,
-                    autocorrect: false,
-                    decoration: InputDecoration(
-                      labelText: 'Email',
-                      hintText: 'jane@example.com',
-                      prefixIcon: const Icon(Icons.email_outlined),
-                      errorText: signupState.emailError,
-                    ),
+                    error: signupState.emailError,
                     onChanged: signupNotifier.setEmail,
                     enabled: !signupState.isLoading,
                   ),
                   const SizedBox(height: AppSpacing.md),
 
                   // Password Field
-                  TextFormField(
+                  AppTextField(
                     initialValue: signupState.password,
-                    obscureText: _obscurePassword,
+                    label: 'Password',
+                    hint: 'At least 8 characters',
+                    prefixIcon: Icons.lock_outline,
+                    isPassword: true,
                     textInputAction: TextInputAction.next,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      hintText: 'At least 8 characters',
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      errorText: signupState.passwordError,
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _obscurePassword = !_obscurePassword;
-                          });
-                        },
-                      ),
-                    ),
+                    error: signupState.passwordError,
                     onChanged: signupNotifier.setPassword,
                     enabled: !signupState.isLoading,
                   ),
                   const SizedBox(height: AppSpacing.md),
 
                   // Confirm Password Field
-                  TextFormField(
+                  AppTextField(
                     initialValue: signupState.confirmPassword,
-                    obscureText: _obscureConfirm,
+                    label: 'Confirm Password',
+                    hint: 'Repeat password',
+                    prefixIcon: Icons.lock_clock_outlined,
+                    isPassword: true,
                     textInputAction: TextInputAction.done,
-                    decoration: InputDecoration(
-                      labelText: 'Confirm Password',
-                      hintText: 'Repeat password',
-                      prefixIcon: const Icon(Icons.lock_clock_outlined),
-                      errorText: signupState.confirmPasswordError,
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscureConfirm
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _obscureConfirm = !_obscureConfirm;
-                          });
-                        },
-                      ),
-                    ),
+                    error: signupState.confirmPasswordError,
                     onChanged: signupNotifier.setConfirmPassword,
-                    onFieldSubmitted: (_) {
+                    onSubmitted: (_) {
                       if (!signupState.isLoading) {
-                        signupNotifier.submit(
-                          apiClient: ref.read(apiClientProvider),
-                          tokenStorage: ref.read(tokenStorageProvider),
-                          context: context,
-                        );
+                        _submit();
                       }
                     },
                     enabled: !signupState.isLoading,
                   ),
-                  const SizedBox(height: AppSpacing.lg),
+                  const SizedBox(height: AppSpacing.xl),
 
                   // Primary Submit Button
-                  ElevatedButton(
-                    onPressed: signupState.isLoading
-                        ? null
-                        : () => signupNotifier.submit(
-                              apiClient: ref.read(apiClientProvider),
-                              tokenStorage: ref.read(tokenStorageProvider),
-                              context: context,
-                            ),
-                    child: signupState.isLoading
-                        ? SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: theme.colorScheme.onPrimary,
-                            ),
-                          )
-                        : const Text('Create Account'),
+                  AppButton.primary(
+                    label: 'Create Account',
+                    isLoading: signupState.isLoading,
+                    onPressed: signupState.isLoading ? null : _submit,
                   ),
                   const SizedBox(height: AppSpacing.lg),
 
@@ -192,14 +170,17 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     children: [
                       Text(
                         'Already have an account?',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                        style: AppTypography.bodyMedium.copyWith(
+                          color: colorScheme.onSurfaceVariant,
                         ),
                       ),
                       TextButton(
                         onPressed: signupState.isLoading
                             ? null
-                            : () => context.go(AppRoutes.loginPath),
+                            : () {
+                                HapticFeedback.lightImpact();
+                                context.go(AppRoutes.loginPath);
+                              },
                         child: const Text('Log In'),
                       ),
                     ],

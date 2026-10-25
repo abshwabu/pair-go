@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/router.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_radii.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_theme_extension.dart';
+import '../../core/theme/app_typography.dart';
+import '../../core/widgets/app_button.dart';
 import '../../core/widgets/error_banner.dart';
 import 'finding_match_provider.dart';
 import 'matching_state_provider.dart';
@@ -33,15 +38,15 @@ class _FindingMatchScreenState extends ConsumerState<FindingMatchScreen>
 
     _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1400),
+      duration: const Duration(milliseconds: 1600),
     )..repeat(reverse: true);
 
-    _pulseScaleAnimation = Tween<double>(begin: 0.94, end: 1.12).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    _pulseScaleAnimation = Tween<double>(begin: 0.94, end: 1.14).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOutCubic),
     );
 
-    _pulseOpacityAnimation = Tween<double>(begin: 0.7, end: 1.0).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    _pulseOpacityAnimation = Tween<double>(begin: 0.45, end: 0.9).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOutCubic),
     );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -69,6 +74,7 @@ class _FindingMatchScreenState extends ConsumerState<FindingMatchScreen>
   }
 
   Future<void> _handleCancelSearch() async {
+    HapticFeedback.lightImpact();
     final apiClient = ref.read(apiClientProvider);
     try {
       await ref
@@ -88,12 +94,15 @@ class _FindingMatchScreenState extends ConsumerState<FindingMatchScreen>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final tokens = context.tokens;
     final legacyMatchState = ref.watch(findingMatchNotifierProvider);
     final unifiedAsync = ref.watch(matchingStateProvider);
     final unifiedState = unifiedAsync.value;
 
     // Listen to unified matching state changes for clean declarative navigation
-    ref.listen<AsyncValue<MatchingStateModel>>(matchingStateProvider, (previous, next) {
+    ref.listen<AsyncValue<MatchingStateModel>>(matchingStateProvider,
+        (previous, next) {
       final nextState = next.value;
       if (nextState == null) return;
 
@@ -129,25 +138,25 @@ class _FindingMatchScreenState extends ConsumerState<FindingMatchScreen>
                     vertical: AppSpacing.sm,
                   ),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer.withValues(alpha: 0.7),
+                    color: colorScheme.primaryContainer.withValues(alpha: 0.7),
                     borderRadius: AppRadius.borderRadiusMd,
                     border: Border.all(
-                      color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                      color: colorScheme.primary.withValues(alpha: 0.3),
                     ),
                   ),
                   child: Row(
                     children: [
                       Icon(
                         Icons.info_outline_rounded,
-                        color: theme.colorScheme.primary,
+                        color: colorScheme.primary,
                         size: 20,
                       ),
                       const SizedBox(width: AppSpacing.sm),
                       Expanded(
                         child: Text(
                           bannerMessage,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onPrimaryContainer,
+                          style: AppTypography.bodySmall.copyWith(
+                            color: colorScheme.onPrimaryContainer,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -168,44 +177,73 @@ class _FindingMatchScreenState extends ConsumerState<FindingMatchScreen>
 
               const Spacer(flex: 1),
 
-              // Animated Pulsing Matching Visualizer
+              // Animated Radar Orb Visualizer
               Center(
                 child: AnimatedBuilder(
                   animation: _pulseController,
                   builder: (context, child) {
-                    return Transform.scale(
-                      scale: _pulseScaleAnimation.value,
-                      child: Container(
-                        width: 160,
-                        height: 160,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: theme.colorScheme.primaryContainer.withValues(
-                            alpha: _pulseOpacityAnimation.value * 0.45,
-                          ),
-                          border: Border.all(
-                            color: theme.colorScheme.primary.withValues(
-                              alpha: _pulseOpacityAnimation.value * 0.6,
-                            ),
-                            width: 2.5,
-                          ),
-                        ),
-                        child: Center(
+                    final scale = _pulseScaleAnimation.value;
+                    final opacity = _pulseOpacityAnimation.value;
+
+                    return Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Outer Radar Ring
+                        Transform.scale(
+                          scale: scale * 1.18,
                           child: Container(
-                            width: 110,
-                            height: 110,
+                            width: 170,
+                            height: 170,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: theme.colorScheme.primaryContainer,
-                            ),
-                            child: Icon(
-                              Icons.people_alt_rounded,
-                              size: 52,
-                              color: theme.colorScheme.onPrimaryContainer,
+                              color: tokens.flame.withValues(alpha: opacity * 0.12),
+                              border: Border.all(
+                                color: tokens.flame.withValues(alpha: opacity * 0.35),
+                                width: 1.5,
+                              ),
                             ),
                           ),
                         ),
-                      ),
+                        // Middle Pulsing Ring
+                        Transform.scale(
+                          scale: scale,
+                          child: Container(
+                            width: 135,
+                            height: 135,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: colorScheme.primaryContainer
+                                  .withValues(alpha: opacity * 0.45),
+                              border: Border.all(
+                                color: colorScheme.primary
+                                  .withValues(alpha: opacity * 0.6),
+                                width: 2.0,
+                              ),
+                            ),
+                          ),
+                        ),
+                        // Inner Core Container
+                        Container(
+                          width: 96,
+                          height: 96,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: colorScheme.primary,
+                            boxShadow: [
+                              BoxShadow(
+                                color: colorScheme.primary.withValues(alpha: 0.3),
+                                blurRadius: 18,
+                                spreadRadius: 3,
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            Icons.people_alt_rounded,
+                            size: 46,
+                            color: colorScheme.onPrimary,
+                          ),
+                        ),
+                      ],
                     );
                   },
                 ),
@@ -216,14 +254,14 @@ class _FindingMatchScreenState extends ConsumerState<FindingMatchScreen>
               // Title
               Text(
                 'Finding your Pair',
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.onSurface,
+                style: AppTypography.headlineMedium.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: colorScheme.onSurface,
                 ),
                 textAlign: TextAlign.center,
               ),
 
-              const SizedBox(height: AppSpacing.md),
+              const SizedBox(height: AppSpacing.sm),
 
               // Rotating Status Text
               SizedBox(
@@ -233,8 +271,8 @@ class _FindingMatchScreenState extends ConsumerState<FindingMatchScreen>
                   child: Text(
                     currentStatusMessage,
                     key: ValueKey<int>(legacyMatchState.statusTextIndex),
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -249,32 +287,13 @@ class _FindingMatchScreenState extends ConsumerState<FindingMatchScreen>
               const Spacer(flex: 2),
 
               // Cancel Search Button
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: legacyMatchState.isCancelling ? null : _handleCancelSearch,
-                  icon: legacyMatchState.isCancelling
-                      ? SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: theme.colorScheme.primary,
-                          ),
-                        )
-                      : const Icon(Icons.close_rounded),
-                  label: Text(
-                    legacyMatchState.isCancelling ? 'Cancelling...' : 'Cancel Search',
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: AppSpacing.md,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: AppRadius.borderRadiusMd,
-                    ),
-                  ),
-                ),
+              AppButton.secondary(
+                label: 'Cancel Search',
+                isLoading: legacyMatchState.isCancelling,
+                leadingIcon: Icons.close_rounded,
+                onPressed: legacyMatchState.isCancelling
+                    ? null
+                    : _handleCancelSearch,
               ),
             ],
           ),

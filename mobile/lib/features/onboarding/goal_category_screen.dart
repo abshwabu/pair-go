@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/router.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_motion.dart';
+import '../../core/theme/app_radii.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_typography.dart';
+import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_card.dart';
+import '../../core/widgets/onboarding_step_header.dart';
 import 'goal_category_provider.dart';
 
 class GoalCategoryScreen extends ConsumerWidget {
@@ -12,126 +19,159 @@ class GoalCategoryScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final selectedCategory = ref.watch(selectedGoalCategoryProvider);
+
+    void selectAndNavigate(String key) {
+      HapticFeedback.lightImpact();
+      ref.read(selectedGoalCategoryProvider.notifier).select(key);
+      context.go(AppRoutes.goalDetailPath);
+    }
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Goal Category'),
       ),
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpacing.lg),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.sm,
+          ),
+          child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 540),
+              constraints: const BoxConstraints(maxWidth: 520),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    'What is your main focus?',
-                    style: theme.textTheme.headlineLarge,
-                    textAlign: TextAlign.center,
+                  OnboardingStepHeader(
+                    currentStep: 2,
+                    totalSteps: 4,
+                    onBack: () => context.pop(),
                   ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    'Select a category to be paired with an accountability partner who shares your commitment.',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: kGoalCategories.length,
-                    separatorBuilder: (_, __) =>
-                        const SizedBox(height: AppSpacing.md),
-                    itemBuilder: (context, index) {
-                      final item = kGoalCategories[index];
-                      final isSelected = selectedCategory == item.key;
+                  const SizedBox(height: AppSpacing.sm),
+                        Text(
+                          'What is your main focus?',
+                          style: AppTypography.headlineLarge.copyWith(
+                            color: colorScheme.onSurface,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          'Select a category to be paired with an accountability partner who shares your commitment.',
+                          style: AppTypography.bodyMedium.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
 
-                      return Card(
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: AppRadius.borderRadiusMd,
-                          side: BorderSide(
-                            color: isSelected
-                                ? theme.colorScheme.primary
-                                : theme.dividerColor,
-                            width: isSelected ? 2.0 : 1.0,
-                          ),
-                        ),
-                        child: InkWell(
-                          borderRadius: AppRadius.borderRadiusMd,
-                          onTap: () {
-                            ref
-                                .read(selectedGoalCategoryProvider.notifier)
-                                .select(item.key);
-                            context.go(AppRoutes.goalDetailPath);
+                        // 2-Column Grid of rich category cards
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final cardWidth = (constraints.maxWidth - AppSpacing.sm) / 2;
+
+                            return Wrap(
+                              spacing: AppSpacing.sm,
+                              runSpacing: AppSpacing.sm,
+                              children: kGoalCategories.map((item) {
+                                final isSelected = selectedCategory == item.key;
+                                final isCustom = item.key == 'custom';
+                                final effectiveWidth = isCustom
+                                    ? constraints.maxWidth
+                                    : cardWidth;
+
+                                return SizedBox(
+                                  width: effectiveWidth,
+                                  child: AppCard(
+                                    onTap: () => selectAndNavigate(item.key),
+                                    isSelected: isSelected,
+                                    padding: const EdgeInsets.all(AppSpacing.md),
+                                    child: AnimatedContainer(
+                                      duration: AppMotion.shortDuration,
+                                      curve: AppMotion.easeOutCubic,
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Container(
+                                                width: 44,
+                                                height: 44,
+                                                decoration: BoxDecoration(
+                                                  color: isSelected
+                                                      ? colorScheme.primary
+                                                      : colorScheme
+                                                          .primaryContainer,
+                                                  borderRadius:
+                                                      AppRadius.borderRadiusSm,
+                                                ),
+                                                child: Icon(
+                                                  item.icon,
+                                                  color: isSelected
+                                                      ? colorScheme.onPrimary
+                                                      : colorScheme.primary,
+                                                  size: 24,
+                                                ),
+                                              ),
+                                              if (isSelected)
+                                                Icon(
+                                                  Icons.check_circle_rounded,
+                                                  color: colorScheme.primary,
+                                                  size: 20,
+                                                ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: AppSpacing.md),
+                                          Text(
+                                            item.title,
+                                            style: AppTypography.titleMedium
+                                                .copyWith(
+                                              fontWeight: FontWeight.w700,
+                                              color: colorScheme.onSurface,
+                                            ),
+                                          ),
+                                          const SizedBox(
+                                              height: AppSpacing.xxs),
+                                          Text(
+                                            item.description,
+                                            style: AppTypography.bodySmall
+                                                .copyWith(
+                                              color: colorScheme
+                                                  .onSurfaceVariant,
+                                            ),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            );
                           },
-                          child: Padding(
-                            padding: const EdgeInsets.all(AppSpacing.md),
-                            child: Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(AppSpacing.sm),
-                                  decoration: BoxDecoration(
-                                    color: isSelected
-                                        ? theme.colorScheme.primary
-                                        : theme.colorScheme.primaryContainer,
-                                    borderRadius: AppRadius.borderRadiusSm,
-                                  ),
-                                  child: Icon(
-                                    item.icon,
-                                    color: isSelected
-                                        ? theme.colorScheme.onPrimary
-                                        : theme.colorScheme.primary,
-                                    size: 28,
-                                  ),
-                                ),
-                                const SizedBox(width: AppSpacing.md),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        item.title,
-                                        style: theme.textTheme.titleMedium
-                                            ?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      const SizedBox(height: AppSpacing.xxs),
-                                      Text(
-                                        item.description,
-                                        style:
-                                            theme.textTheme.bodySmall?.copyWith(
-                                          color: theme
-                                              .colorScheme.onSurfaceVariant,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Icon(
-                                  Icons.chevron_right_rounded,
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
-                              ],
-                            ),
-                          ),
                         ),
-                      );
-                    },
+                        const SizedBox(height: AppSpacing.xl),
+
+                        // Pinned Continue Button
+                        AppButton.primary(
+                          label: 'Continue',
+                          onPressed: selectedCategory != null
+                              ? () => selectAndNavigate(selectedCategory)
+                              : null,
+                        ),
+                      ],
+                    ),
                   ),
-                ],
+                ),
               ),
             ),
-          ),
-        ),
-      ),
     );
   }
 }

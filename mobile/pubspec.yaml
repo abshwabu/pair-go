@@ -44,6 +44,8 @@ dependencies:
   shared_preferences: ^2.5.5
   firebase_messaging: ^17.0.1
   firebase_core: ^5.1.0
+  animations: ^2.2.0
+  shimmer: ^3.0.0
 
 dev_dependencies:
   flutter_test:
@@ -67,6 +69,13 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  fonts:
+    - family: PlusJakartaSans
+      fonts:
+        - asset: assets/fonts/PlusJakartaSans-Regular.ttf
+        - asset: assets/fonts/PlusJakartaSans-Italic.ttf
+          style: italic
 
   # To add assets to your application, add an assets section, like this:
   # assets:

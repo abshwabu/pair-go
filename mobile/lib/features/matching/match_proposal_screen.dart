@@ -1,14 +1,19 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/router.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_radii.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_typography.dart';
+import '../../core/widgets/app_avatar.dart';
+import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_card.dart';
 import '../../core/widgets/error_banner.dart';
 import 'matching_state_provider.dart';
-import 'models/matching_state_model.dart';
 
 class MatchProposalScreen extends ConsumerStatefulWidget {
   const MatchProposalScreen({super.key});
@@ -108,6 +113,7 @@ class _MatchProposalScreenState extends ConsumerState<MatchProposalScreen>
   }
 
   Future<void> _handleAccept(String proposalId) async {
+    HapticFeedback.lightImpact();
     setState(() {
       _isSubmitting = true;
       _errorMessage = null;
@@ -157,6 +163,7 @@ class _MatchProposalScreenState extends ConsumerState<MatchProposalScreen>
   }
 
   Future<void> _handlePass(String proposalId) async {
+    HapticFeedback.lightImpact();
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -171,18 +178,19 @@ class _MatchProposalScreenState extends ConsumerState<MatchProposalScreen>
             children: [
               Text(
                 'Pass on this match?',
-                style: Theme.of(bottomSheetCtx).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: AppTypography.titleLarge.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: Theme.of(bottomSheetCtx).colorScheme.onSurface,
+                ),
               ),
-              const SizedBox(height: AppSpacing.sm),
+              const SizedBox(height: AppSpacing.xs),
               Text(
                 "We'll keep looking for someone else.",
-                style: Theme.of(bottomSheetCtx).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(bottomSheetCtx)
-                          .colorScheme
-                          .onSurfaceVariant,
-                    ),
+                style: AppTypography.bodyMedium.copyWith(
+                  color: Theme.of(bottomSheetCtx)
+                      .colorScheme
+                      .onSurfaceVariant,
+                ),
               ),
               const SizedBox(height: AppSpacing.xl),
               Row(
@@ -261,6 +269,7 @@ class _MatchProposalScreenState extends ConsumerState<MatchProposalScreen>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final matchAsync = ref.watch(matchingStateProvider);
 
     return Scaffold(
@@ -282,10 +291,11 @@ class _MatchProposalScreenState extends ConsumerState<MatchProposalScreen>
                 children: [
                   ErrorBanner(message: err.toString()),
                   const SizedBox(height: AppSpacing.md),
-                  FilledButton(
+                  AppButton.primary(
+                    label: 'Retry',
+                    isFullWidth: false,
                     onPressed: () =>
                         ref.read(matchingStateProvider.notifier).refresh(),
-                    child: const Text('Retry'),
                   ),
                 ],
               ),
@@ -302,13 +312,14 @@ class _MatchProposalScreenState extends ConsumerState<MatchProposalScreen>
                     children: [
                       const Text('No match proposal available.'),
                       const SizedBox(height: AppSpacing.md),
-                      FilledButton(
+                      AppButton.primary(
+                        label: 'Continue',
+                        isFullWidth: false,
                         onPressed: () => navigateForMatchingState(
                           context,
                           state,
                           inMatchingFlow: true,
                         ),
-                        child: const Text('Continue'),
                       ),
                     ],
                   ),
@@ -320,173 +331,158 @@ class _MatchProposalScreenState extends ConsumerState<MatchProposalScreen>
             final partnerGoal = proposal.partnerGoal;
 
             return SingleChildScrollView(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (_errorMessage != null) ...[
-                    ErrorBanner(message: _errorMessage!),
-                    const SizedBox(height: AppSpacing.md),
-                  ],
-
-                  // Live Expiry Banner
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md,
-                      vertical: AppSpacing.sm,
-                    ),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
-                      borderRadius: AppRadius.borderRadiusSm,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.timer_outlined,
-                          size: 18,
-                          color: theme.colorScheme.primary,
-                        ),
-                        const SizedBox(width: AppSpacing.xs),
-                        Text(
-                          'Respond within ${_formatCountdown(_remaining)}',
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: theme.colorScheme.primary,
-                          ),
-                        ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg,
+                vertical: AppSpacing.md,
+              ),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 440),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (_errorMessage != null) ...[
+                        ErrorBanner(message: _errorMessage!),
+                        const SizedBox(height: AppSpacing.md),
                       ],
-                    ),
-                  ),
 
-                  const SizedBox(height: AppSpacing.lg),
-
-                  // Prominent Partner Card
-                  Card(
-                    elevation: 1,
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: AppRadius.borderRadiusLg,
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppSpacing.xl),
-                      child: Column(
-                        children: [
-                          CircleAvatar(
-                            radius: 44,
-                            backgroundColor: theme.colorScheme.primaryContainer,
-                            backgroundImage: partner.avatarUrl != null &&
-                                    partner.avatarUrl!.isNotEmpty
-                                ? NetworkImage(partner.avatarUrl!)
-                                : null,
-                            child: partner.avatarUrl == null ||
-                                    partner.avatarUrl!.isEmpty
-                                ? Text(
-                                    partner.name.isNotEmpty
-                                        ? partner.name[0].toUpperCase()
-                                        : 'P',
-                                    style: theme.textTheme.headlineLarge?.copyWith(
-                                      color:
-                                          theme.colorScheme.onPrimaryContainer,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  )
-                                : null,
-                          ),
-                          const SizedBox(height: AppSpacing.md),
-                          Text(
-                            partner.name,
-                            style: theme.textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: theme.colorScheme.onSurface,
+                      // Live Expiry Banner
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                          vertical: AppSpacing.sm,
+                        ),
+                        decoration: BoxDecoration(
+                          color: colorScheme.primaryContainer
+                              .withValues(alpha: 0.6),
+                          borderRadius: AppRadius.borderRadiusSm,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.timer_outlined,
+                              size: 18,
+                              color: colorScheme.primary,
                             ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: AppSpacing.xs),
-                          Text(
-                            partnerGoal.title,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
+                            const SizedBox(width: AppSpacing.xs),
+                            Text(
+                              'Respond within ${_formatCountdown(_remaining)}',
+                              style: AppTypography.labelLarge.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: colorScheme.primary,
+                              ),
                             ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: AppSpacing.md),
-
-                          // Chips
-                          Wrap(
-                            alignment: WrapAlignment.center,
-                            spacing: AppSpacing.xs,
-                            runSpacing: AppSpacing.xs,
-                            children: [
-                              Chip(
-                                avatar: const Icon(Icons.flag_outlined, size: 16),
-                                label: Text(
-                                  partnerGoal.category.toUpperCase(),
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                                visualDensity: VisualDensity.compact,
-                              ),
-                              Chip(
-                                avatar: const Icon(Icons.speed_rounded, size: 16),
-                                label: Text(
-                                  partnerGoal.pace.toUpperCase(),
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                                visualDensity: VisualDensity.compact,
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: AppSpacing.md),
-                          const Divider(),
-                          const SizedBox(height: AppSpacing.sm),
-
-                          // Timezone Difference Info
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.public_rounded,
-                                size: 18,
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                              const SizedBox(width: AppSpacing.xs),
-                              Text(
-                                _formatTimezoneDiff(partner.utcOffsetHours),
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  ),
+                      const SizedBox(height: AppSpacing.lg),
 
-                  const SizedBox(height: AppSpacing.xxl),
-
-                  // Actions
-                  FilledButton(
-                    onPressed: _isSubmitting ? null : () => _handleAccept(proposal.id),
-                    child: _isSubmitting
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
+                      // Prominent Partner Card
+                      AppCard(
+                        padding: const EdgeInsets.all(AppSpacing.xl),
+                        child: Column(
+                          children: [
+                            AppAvatar(
+                              size: AppAvatarSize.xl,
+                              imageUrl: partner.avatarUrl,
+                              name: partner.name,
+                              hasRing: true,
+                              ringColor: colorScheme.primary,
                             ),
-                          )
-                        : const Text("Let's go"),
+                            const SizedBox(height: AppSpacing.md),
+                            Text(
+                              partner.name,
+                              style: AppTypography.headlineSmall.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: colorScheme.onSurface,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: AppSpacing.xs),
+                            Text(
+                              partnerGoal.title,
+                              style: AppTypography.titleMedium.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: AppSpacing.md),
+
+                            // Category and Pace Chips
+                            Wrap(
+                              alignment: WrapAlignment.center,
+                              spacing: AppSpacing.xs,
+                              runSpacing: AppSpacing.xs,
+                              children: [
+                                Chip(
+                                  avatar: const Icon(Icons.flag_outlined,
+                                      size: 16),
+                                  label: Text(
+                                    partnerGoal.category.toUpperCase(),
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                Chip(
+                                  avatar: const Icon(Icons.speed_rounded,
+                                      size: 16),
+                                  label: Text(
+                                    partnerGoal.pace.toUpperCase(),
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(height: AppSpacing.md),
+                            const Divider(),
+                            const SizedBox(height: AppSpacing.sm),
+
+                            // Timezone Difference Info
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.public_rounded,
+                                  size: 18,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                                const SizedBox(width: AppSpacing.xs),
+                                Text(
+                                  _formatTimezoneDiff(partner.utcOffsetHours),
+                                  style: AppTypography.bodyMedium.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+
+                      // Actions
+                      AppButton.primary(
+                        label: "Let's go",
+                        isLoading: _isSubmitting,
+                        onPressed: _isSubmitting
+                            ? null
+                            : () => _handleAccept(proposal.id),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      AppButton.secondary(
+                        label: 'Pass',
+                        isLoading: _isSubmitting,
+                        onPressed: _isSubmitting
+                            ? null
+                            : () => _handlePass(proposal.id),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: AppSpacing.sm),
-                  OutlinedButton(
-                    onPressed: _isSubmitting ? null : () => _handlePass(proposal.id),
-                    child: const Text('Pass'),
-                  ),
-                ],
+                ),
               ),
             );
           },

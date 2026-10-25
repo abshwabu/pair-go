@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/router.dart';
 import '../../core/storage/token_storage.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_radii.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_typography.dart';
+import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_text_field.dart';
 import '../../core/widgets/error_banner.dart';
 import 'login_provider.dart';
 
@@ -17,11 +22,19 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  bool _obscurePassword = true;
+  void _submit() {
+    HapticFeedback.lightImpact();
+    ref.read(loginNotifierProvider.notifier).submit(
+          apiClient: ref.read(apiClientProvider),
+          tokenStorage: ref.read(tokenStorageProvider),
+          context: context,
+        );
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final loginState = ref.watch(loginNotifierProvider);
     final loginNotifier = ref.read(loginNotifierProvider.notifier);
 
@@ -29,114 +42,97 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpacing.lg),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.xl,
+            ),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 400),
+              constraints: const BoxConstraints(maxWidth: 420),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Icon(
-                    Icons.lock_outline_rounded,
-                    size: 48,
-                    color: theme.colorScheme.primary,
+                  Center(
+                    child: Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: colorScheme.primaryContainer,
+                        borderRadius: AppRadius.borderRadiusLg,
+                      ),
+                      child: Icon(
+                        Icons.lock_outline_rounded,
+                        size: 32,
+                        color: colorScheme.primary,
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: AppSpacing.md),
+                  const SizedBox(height: AppSpacing.lg),
                   Text(
                     'Welcome back',
-                    style: theme.textTheme.headlineLarge,
+                    style: AppTypography.headlineLarge.copyWith(
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.w700,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    'Log in to your Pair accountability account',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                    'Pick up where you left off with your partner.',
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                     ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: AppSpacing.xl),
 
                   // Error Banner
-                  if (loginState.errorMessage != null)
+                  if (loginState.errorMessage != null) ...[
                     ErrorBanner(
                       message: loginState.errorMessage,
                       onDismiss: loginNotifier.clearErrorMessage,
                     ),
+                    const SizedBox(height: AppSpacing.md),
+                  ],
 
                   // Email Field
-                  TextFormField(
+                  AppTextField(
                     initialValue: loginState.email,
+                    label: 'Email',
+                    hint: 'you@example.com',
+                    prefixIcon: Icons.email_outlined,
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.next,
-                    autocorrect: false,
-                    decoration: InputDecoration(
-                      labelText: 'Email',
-                      hintText: 'you@example.com',
-                      prefixIcon: const Icon(Icons.email_outlined),
-                      errorText: loginState.emailError,
-                    ),
+                    error: loginState.emailError,
                     onChanged: loginNotifier.setEmail,
                     enabled: !loginState.isLoading,
                   ),
                   const SizedBox(height: AppSpacing.md),
 
                   // Password Field
-                  TextFormField(
+                  AppTextField(
                     initialValue: loginState.password,
-                    obscureText: _obscurePassword,
+                    label: 'Password',
+                    hint: '••••••••',
+                    prefixIcon: Icons.lock_outline,
+                    isPassword: true,
                     textInputAction: TextInputAction.done,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      hintText: '••••••••',
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      errorText: loginState.passwordError,
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _obscurePassword = !_obscurePassword;
-                          });
-                        },
-                      ),
-                    ),
+                    error: loginState.passwordError,
                     onChanged: loginNotifier.setPassword,
-                    onFieldSubmitted: (_) {
+                    onSubmitted: (_) {
                       if (!loginState.isLoading) {
-                        loginNotifier.submit(
-                          apiClient: ref.read(apiClientProvider),
-                          tokenStorage: ref.read(tokenStorageProvider),
-                          context: context,
-                        );
+                        _submit();
                       }
                     },
                     enabled: !loginState.isLoading,
                   ),
-                  const SizedBox(height: AppSpacing.lg),
+                  const SizedBox(height: AppSpacing.xl),
 
                   // Primary Submit Button
-                  ElevatedButton(
-                    onPressed: loginState.isLoading
-                        ? null
-                        : () => loginNotifier.submit(
-                              apiClient: ref.read(apiClientProvider),
-                              tokenStorage: ref.read(tokenStorageProvider),
-                              context: context,
-                            ),
-                    child: loginState.isLoading
-                        ? SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: theme.colorScheme.onPrimary,
-                            ),
-                          )
-                        : const Text('Log In'),
+                  AppButton.primary(
+                    label: 'Log In',
+                    isLoading: loginState.isLoading,
+                    onPressed: loginState.isLoading ? null : _submit,
                   ),
                   const SizedBox(height: AppSpacing.lg),
 
@@ -147,14 +143,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     children: [
                       Text(
                         "Don't have an account?",
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                        style: AppTypography.bodyMedium.copyWith(
+                          color: colorScheme.onSurfaceVariant,
                         ),
                       ),
                       TextButton(
                         onPressed: loginState.isLoading
                             ? null
-                            : () => context.go(AppRoutes.signupPath),
+                            : () {
+                                HapticFeedback.lightImpact();
+                                context.go(AppRoutes.signupPath);
+                              },
                         child: const Text('Sign Up'),
                       ),
                     ],

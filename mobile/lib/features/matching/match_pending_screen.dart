@@ -1,10 +1,15 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/router.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_radii.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_typography.dart';
+import '../../core/widgets/app_avatar.dart';
+import '../../core/widgets/app_card.dart';
 import 'matching_state_provider.dart';
 import 'models/matching_state_model.dart';
 
@@ -32,15 +37,15 @@ class _MatchPendingScreenState extends ConsumerState<MatchPendingScreen>
 
     _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2000),
+      duration: const Duration(milliseconds: 2200),
     )..repeat(reverse: true);
 
-    _scaleAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    _scaleAnimation = Tween<double>(begin: 0.94, end: 1.06).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOutCubic),
     );
 
-    _opacityAnimation = Tween<double>(begin: 0.6, end: 1.0).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    _opacityAnimation = Tween<double>(begin: 0.55, end: 0.95).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOutCubic),
     );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -121,6 +126,7 @@ class _MatchPendingScreenState extends ConsumerState<MatchPendingScreen>
   }
 
   Future<void> _handleCancel() async {
+    HapticFeedback.lightImpact();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogCtx) => AlertDialog(
@@ -168,10 +174,12 @@ class _MatchPendingScreenState extends ConsumerState<MatchPendingScreen>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final matchAsync = ref.watch(matchingStateProvider);
 
     // Listen to polling updates for transitions
-    ref.listen<AsyncValue<MatchingStateModel>>(matchingStateProvider, (prev, next) {
+    ref.listen<AsyncValue<MatchingStateModel>>(matchingStateProvider,
+        (prev, next) {
       final nextState = next.value;
       if (nextState == null) return;
 
@@ -218,7 +226,7 @@ class _MatchPendingScreenState extends ConsumerState<MatchPendingScreen>
                 children: [
                   const Spacer(flex: 1),
 
-                  // Calm Waiting Animation
+                  // Calm Breathing Animation
                   Center(
                     child: AnimatedBuilder(
                       animation: _pulseController,
@@ -230,13 +238,11 @@ class _MatchPendingScreenState extends ConsumerState<MatchPendingScreen>
                             height: 140,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: theme.colorScheme.primaryContainer.withValues(
-                                alpha: _opacityAnimation.value * 0.4,
-                              ),
+                              color: colorScheme.primaryContainer
+                                  .withValues(alpha: _opacityAnimation.value * 0.4),
                               border: Border.all(
-                                color: theme.colorScheme.primary.withValues(
-                                  alpha: _opacityAnimation.value * 0.7,
-                                ),
+                                color: colorScheme.primary
+                                    .withValues(alpha: _opacityAnimation.value * 0.7),
                                 width: 2,
                               ),
                             ),
@@ -244,7 +250,7 @@ class _MatchPendingScreenState extends ConsumerState<MatchPendingScreen>
                               child: Icon(
                                 Icons.hourglass_top_rounded,
                                 size: 52,
-                                color: theme.colorScheme.primary,
+                                color: colorScheme.primary,
                               ),
                             ),
                           ),
@@ -255,72 +261,62 @@ class _MatchPendingScreenState extends ConsumerState<MatchPendingScreen>
 
                   const SizedBox(height: AppSpacing.xxl),
 
-                  // Headline
+                  // Headline with partner's first name
                   Text(
                     'Waiting for $firstName to confirm',
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.onSurface,
+                    style: AppTypography.headlineSmall.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.onSurface,
                     ),
                     textAlign: TextAlign.center,
                   ),
 
                   const SizedBox(height: AppSpacing.sm),
 
-                  // Live Countdown
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.timer_outlined,
-                        size: 16,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: AppSpacing.xs),
-                      Text(
-                        'Expires in ${_formatCountdown(_remaining)}',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                  // Live Countdown Pill
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.xs,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest,
+                      borderRadius: AppRadius.borderRadiusFull,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.timer_outlined,
+                          size: 16,
+                          color: colorScheme.onSurfaceVariant,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: AppSpacing.xs),
+                        Text(
+                          'Expires in ${_formatCountdown(_remaining)}',
+                          style: AppTypography.bodySmall.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
 
                   const SizedBox(height: AppSpacing.xl),
 
-                  // Compact Partner Card
+                  // Compact Partner Mini-Card
                   if (partner != null && partnerGoal != null)
-                    Card(
-                      elevation: 0,
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: AppRadius.borderRadiusMd,
-                      ),
-                      child: Padding(
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 420),
+                      child: AppCard(
                         padding: const EdgeInsets.all(AppSpacing.md),
                         child: Row(
                           children: [
-                            CircleAvatar(
-                              radius: 26,
-                              backgroundColor:
-                                  theme.colorScheme.primaryContainer,
-                              backgroundImage: partner.avatarUrl != null &&
-                                      partner.avatarUrl!.isNotEmpty
-                                  ? NetworkImage(partner.avatarUrl!)
-                                  : null,
-                              child: partner.avatarUrl == null ||
-                                      partner.avatarUrl!.isEmpty
-                                  ? Text(
-                                      partner.name.isNotEmpty
-                                          ? partner.name[0].toUpperCase()
-                                          : 'P',
-                                      style: TextStyle(
-                                        color: theme
-                                            .colorScheme.onPrimaryContainer,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    )
-                                : null,
+                            AppAvatar(
+                              size: AppAvatarSize.md,
+                              imageUrl: partner.avatarUrl,
+                              name: partner.name,
                             ),
                             const SizedBox(width: AppSpacing.md),
                             Expanded(
@@ -329,35 +325,27 @@ class _MatchPendingScreenState extends ConsumerState<MatchPendingScreen>
                                 children: [
                                   Text(
                                     partner.name,
-                                    style:
-                                        theme.textTheme.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.bold,
+                                    style: AppTypography.titleMedium.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      color: colorScheme.onSurface,
                                     ),
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
                                     partnerGoal.title,
-                                    style:
-                                        theme.textTheme.bodySmall?.copyWith(
-                                      color:
-                                          theme.colorScheme.onSurfaceVariant,
+                                    style: AppTypography.bodySmall.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
-                                  const SizedBox(height: 6),
-                                  Row(
-                                    children: [
-                                      Text(
-                                        _formatTimezoneDiff(
-                                            partner.utcOffsetHours),
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: theme
-                                              .colorScheme.onSurfaceVariant,
-                                        ),
-                                      ),
-                                    ],
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _formatTimezoneDiff(
+                                        partner.utcOffsetHours),
+                                    style: AppTypography.labelSmall.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -380,8 +368,8 @@ class _MatchPendingScreenState extends ConsumerState<MatchPendingScreen>
                           )
                         : Text(
                             'Cancel',
-                            style: TextStyle(
-                              color: theme.colorScheme.error,
+                            style: AppTypography.labelLarge.copyWith(
+                              color: colorScheme.error,
                             ),
                           ),
                   ),

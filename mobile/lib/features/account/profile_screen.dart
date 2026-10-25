@@ -7,6 +7,7 @@ import '../../core/network/fcm_service.dart';
 import '../../core/router.dart';
 import '../../core/storage/token_storage.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/theme_mode_selector.dart';
 import '../auth/auth_state.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -196,6 +197,16 @@ class ProfileScreen extends ConsumerWidget {
               ),
               child: Column(
                 children: [
+                  ListTile(
+                    leading: Icon(
+                      Icons.palette_outlined,
+                      color: theme.colorScheme.primary,
+                    ),
+                    title: const Text('Theme'),
+                    subtitle: const Text('System, Light, or Dark'),
+                    trailing: const ThemeModeSelector(isCompact: true),
+                  ),
+                  const Divider(height: 1),
                   ListTile(
                     leading: Icon(
                       Icons.notifications_outlined,
