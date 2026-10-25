@@ -266,7 +266,9 @@ void main() {
       expect(find.text('Chat Messages'), findsOneWidget);
       expect(find.text('Check-in Nudges'), findsOneWidget);
       expect(find.text('Streak Alerts'), findsOneWidget);
-      expect(find.text('Match Found'), findsOneWidget);
+      expect(find.text('Match Proposals'), findsOneWidget);
+      expect(find.text('Match Confirmed'), findsOneWidget);
+      expect(find.text('Match Updates'), findsOneWidget);
 
       // Verify in-app notifications section
       expect(find.text('New Message'), findsOneWidget);

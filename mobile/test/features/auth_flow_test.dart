@@ -102,6 +102,24 @@ void main() {
                 ),
               );
             }
+            if (options.path.contains('/matching/current')) {
+              return handler.resolve(
+                Response(
+                  requestOptions: options,
+                  statusCode: 200,
+                  data: {
+                    'data': {
+                      'state': 'none',
+                      'request_id': null,
+                      'pod_id': null,
+                      'proposal': null,
+                    },
+                    'meta': null,
+                    'error': null,
+                  },
+                ),
+              );
+            }
             if (options.path.contains('/pods')) {
               return handler.resolve(
                 Response(
@@ -158,6 +176,24 @@ void main() {
                       'name': 'Test User',
                       'email': 'test@example.com',
                       'timezone': 'UTC',
+                    },
+                    'meta': null,
+                    'error': null,
+                  },
+                ),
+              );
+            }
+            if (options.path.contains('/matching/current')) {
+              return handler.resolve(
+                Response(
+                  requestOptions: options,
+                  statusCode: 200,
+                  data: {
+                    'data': {
+                      'state': 'matched',
+                      'request_id': null,
+                      'pod_id': 'pod-1',
+                      'proposal': null,
                     },
                     'meta': null,
                     'error': null,

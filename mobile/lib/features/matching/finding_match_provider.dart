@@ -5,6 +5,7 @@ import '../../core/network/api_client.dart';
 import '../onboarding/goal_detail_provider.dart';
 import '../onboarding/matching_prefs_provider.dart';
 import '../pods/pod_state.dart';
+import 'matching_state_provider.dart';
 import 'models/matching_request_model.dart';
 
 class FindingMatchState {
@@ -145,6 +146,9 @@ class FindingMatchNotifier extends Notifier<FindingMatchState> {
         request: matchRequest,
       );
 
+      // Refresh unified matching state provider
+      await ref.read(matchingStateProvider.notifier).refresh();
+
       // If matched instantly by the worker
       if (matchRequest.isMatched && matchRequest.podId != null) {
         _setMatched(matchRequest.podId!);
@@ -191,6 +195,7 @@ class FindingMatchNotifier extends Notifier<FindingMatchState> {
     }
 
     // Active request conflict: keep animated search state while polling pods every 5s
+    await ref.read(matchingStateProvider.notifier).refresh();
     state = state.copyWith(
       isSubmitting: false,
       isPolling: true,

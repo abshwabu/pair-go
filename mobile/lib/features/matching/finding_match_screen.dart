@@ -7,6 +7,8 @@ import '../../core/router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/error_banner.dart';
 import 'finding_match_provider.dart';
+import 'matching_state_provider.dart';
+import 'models/matching_state_model.dart';
 
 class FindingMatchScreen extends ConsumerStatefulWidget {
   const FindingMatchScreen({super.key});
@@ -16,14 +18,18 @@ class FindingMatchScreen extends ConsumerStatefulWidget {
 }
 
 class _FindingMatchScreenState extends ConsumerState<FindingMatchScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late AnimationController _pulseController;
   late Animation<double> _pulseScaleAnimation;
   late Animation<double> _pulseOpacityAnimation;
 
+  FindingMatchNotifier? _notifier;
+  MatchingStateNotifier? _matchingNotifier;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
     _pulseController = AnimationController(
       vsync: this,
@@ -40,39 +46,69 @@ class _FindingMatchScreenState extends ConsumerState<FindingMatchScreen>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      _matchingNotifier = ref.read(matchingStateProvider.notifier);
+      _matchingNotifier?.startScreenPolling();
       _notifier = ref.read(findingMatchNotifierProvider.notifier);
       final apiClient = ref.read(apiClientProvider);
       _notifier?.startMatching(apiClient: apiClient);
     });
   }
 
-  FindingMatchNotifier? _notifier;
-
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pulseController.dispose();
     _notifier?.stopPolling();
+    _matchingNotifier?.stopScreenPolling();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    ref.read(matchingStateProvider.notifier).setAppLifecycleState(state);
+  }
+
+  Future<void> _handleCancelSearch() async {
+    final apiClient = ref.read(apiClientProvider);
+    try {
+      await ref
+          .read(findingMatchNotifierProvider.notifier)
+          .cancelSearch(apiClient: apiClient);
+    } catch (_) {}
+
+    try {
+      await ref.read(matchingStateProvider.notifier).cancel();
+    } catch (_) {}
+
+    if (mounted) {
+      context.go(AppRoutes.matchingPrefsPath);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final matchState = ref.watch(findingMatchNotifierProvider);
-    final apiClient = ref.read(apiClientProvider);
+    final legacyMatchState = ref.watch(findingMatchNotifierProvider);
+    final unifiedAsync = ref.watch(matchingStateProvider);
+    final unifiedState = unifiedAsync.value;
 
-    // Listen to matching state changes for clean declarative navigation
-    ref.listen<FindingMatchState>(findingMatchNotifierProvider, (previous, next) {
-      if (next.matchedPodId != null && next.matchedPodId != previous?.matchedPodId) {
-        context.go(AppRoutes.matchFoundPath, extra: next.matchedPodId);
-      } else if (next.shouldRouteToGoalCategory &&
-          previous?.shouldRouteToGoalCategory != true) {
+    // Listen to unified matching state changes for clean declarative navigation
+    ref.listen<AsyncValue<MatchingStateModel>>(matchingStateProvider, (previous, next) {
+      final nextState = next.value;
+      if (nextState == null) return;
+
+      if (nextState.isProposed) {
+        navigateForMatchingState(context, nextState, inMatchingFlow: true);
+      } else if (nextState.isMatched) {
+        context.go(AppRoutes.matchConfirmedPath, extra: nextState.podId);
+      } else if (nextState.isNone && previous?.value?.isSearching == true) {
         context.go(AppRoutes.goalCategoryPath);
       }
     });
 
     final currentStatusMessage =
-        FindingMatchNotifier.statusMessages[matchState.statusTextIndex];
+        FindingMatchNotifier.statusMessages[legacyMatchState.statusTextIndex];
+    final bannerMessage = unifiedState?.rejectionBannerMessage;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -80,10 +116,56 @@ class _FindingMatchScreenState extends ConsumerState<FindingMatchScreen>
         child: Padding(
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.lg,
-            vertical: AppSpacing.xl,
+            vertical: AppSpacing.lg,
           ),
           child: Column(
             children: [
+              // Top Dismissible Rejection/Timeout Banner
+              if (bannerMessage != null && bannerMessage.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.sm,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer.withValues(alpha: 0.7),
+                    borderRadius: AppRadius.borderRadiusMd,
+                    border: Border.all(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline_rounded,
+                        color: theme.colorScheme.primary,
+                        size: 20,
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Text(
+                          bannerMessage,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onPrimaryContainer,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, size: 18),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        onPressed: () {
+                          ref
+                              .read(matchingStateProvider.notifier)
+                              .clearRejectionBanner();
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+
               const Spacer(flex: 1),
 
               // Animated Pulsing Matching Visualizer
@@ -148,13 +230,10 @@ class _FindingMatchScreenState extends ConsumerState<FindingMatchScreen>
                 height: 48,
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 500),
-                  transitionBuilder: (child, animation) {
-                    return FadeTransition(opacity: animation, child: child);
-                  },
                   child: Text(
                     currentStatusMessage,
-                    key: ValueKey<int>(matchState.statusTextIndex),
-                    style: theme.textTheme.bodyLarge?.copyWith(
+                    key: ValueKey<int>(legacyMatchState.statusTextIndex),
+                    style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                     textAlign: TextAlign.center,
@@ -164,8 +243,8 @@ class _FindingMatchScreenState extends ConsumerState<FindingMatchScreen>
 
               const SizedBox(height: AppSpacing.lg),
 
-              if (matchState.errorMessage != null)
-                ErrorBanner(message: matchState.errorMessage!),
+              if (legacyMatchState.errorMessage != null)
+                ErrorBanner(message: legacyMatchState.errorMessage!),
 
               const Spacer(flex: 2),
 
@@ -173,17 +252,8 @@ class _FindingMatchScreenState extends ConsumerState<FindingMatchScreen>
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: matchState.isCancelling
-                      ? null
-                      : () async {
-                          await ref
-                              .read(findingMatchNotifierProvider.notifier)
-                              .cancelSearch(apiClient: apiClient);
-                          if (context.mounted) {
-                            context.go(AppRoutes.matchingPrefsPath);
-                          }
-                        },
-                  icon: matchState.isCancelling
+                  onPressed: legacyMatchState.isCancelling ? null : _handleCancelSearch,
+                  icon: legacyMatchState.isCancelling
                       ? SizedBox(
                           width: 18,
                           height: 18,
@@ -194,9 +264,7 @@ class _FindingMatchScreenState extends ConsumerState<FindingMatchScreen>
                         )
                       : const Icon(Icons.close_rounded),
                   label: Text(
-                    matchState.isCancelling
-                        ? 'Cancelling...'
-                        : 'Cancel Search',
+                    legacyMatchState.isCancelling ? 'Cancelling...' : 'Cancel Search',
                   ),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(

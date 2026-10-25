@@ -10,7 +10,9 @@ import 'package:mobile/features/auth/login_screen.dart';
 import 'package:mobile/features/auth/signup_screen.dart';
 import 'package:mobile/features/auth/splash_screen.dart';
 import 'package:mobile/features/matching/finding_match_screen.dart';
-import 'package:mobile/features/matching/match_found_screen.dart';
+import 'package:mobile/features/matching/match_confirmed_screen.dart';
+import 'package:mobile/features/matching/match_pending_screen.dart';
+import 'package:mobile/features/matching/match_proposal_screen.dart';
 import 'package:mobile/features/onboarding/goal_category_screen.dart';
 import 'package:mobile/features/chat/chat_screen.dart';
 import 'package:mobile/features/onboarding/goal_detail_screen.dart';
@@ -54,7 +56,7 @@ void main() {
   }
 
   group('Router Tests', () {
-    test('Defines all 22 required route names', () {
+    test('Defines all 24 required route names', () {
       const expectedRoutes = [
         'splash',
         'login',
@@ -64,7 +66,9 @@ void main() {
         'goal-detail',
         'matching-prefs',
         'finding-match',
-        'match-found',
+        'match-proposal',
+        'match-pending',
+        'match-confirmed',
         'pod-home',
         'pod-settings',
         'todo-list',
@@ -80,7 +84,7 @@ void main() {
         'account-settings',
       ];
 
-      expect(AppRoutes.allRouteNames.length, 22);
+      expect(AppRoutes.allRouteNames.length, 24);
       for (final route in expectedRoutes) {
         expect(AppRoutes.allRouteNames.contains(route), isTrue,
             reason: 'Missing route: $route');
@@ -211,12 +215,22 @@ void main() {
       await pumpRouter(tester);
       expect(find.byType(FindingMatchScreen), findsOneWidget);
 
-      // 8. Match Found
-      testRouter.go(AppRoutes.matchFoundPath);
+      // 8. Match Proposal
+      testRouter.go(AppRoutes.matchProposalPath);
       await pumpRouter(tester);
-      expect(find.byType(MatchFoundScreen), findsOneWidget);
+      expect(find.byType(MatchProposalScreen), findsOneWidget);
 
-      // 9. Pod Home
+      // 9. Match Pending
+      testRouter.go(AppRoutes.matchPendingPath);
+      await pumpRouter(tester);
+      expect(find.byType(MatchPendingScreen), findsOneWidget);
+
+      // 10. Match Confirmed
+      testRouter.go(AppRoutes.matchConfirmedPath);
+      await pumpRouter(tester);
+      expect(find.byType(MatchConfirmedScreen), findsOneWidget);
+
+      // 11. Pod Home
       testRouter.go(AppRoutes.podHomePath);
       await pumpRouter(tester);
       expect(find.byType(PodHomeScreen), findsOneWidget);

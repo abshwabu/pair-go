@@ -61,12 +61,17 @@ class _NotificationSettingsScreenState
           context.push(AppRoutes.podHomePath);
         }
         break;
+      case 'match_proposed':
+        context.push(AppRoutes.matchProposalPath);
+        break;
+      case 'match_confirmed':
+        context.push(AppRoutes.matchConfirmedPath, extra: podId);
+        break;
+      case 'match_declined':
+        context.push(AppRoutes.findingMatchPath);
+        break;
       case 'match_found':
-        if (podId != null && podId.isNotEmpty) {
-          context.push(AppRoutes.podHomePath, extra: podId);
-        } else {
-          context.push(AppRoutes.podHomePath);
-        }
+        context.push(AppRoutes.matchConfirmedPath, extra: podId);
         break;
       default:
         if (podId != null && podId.isNotEmpty) {
@@ -84,6 +89,12 @@ class _NotificationSettingsScreenState
         return Icons.touch_app_outlined;
       case 'streak_broken':
         return Icons.warning_amber_rounded;
+      case 'match_proposed':
+        return Icons.person_search_rounded;
+      case 'match_confirmed':
+        return Icons.celebration_rounded;
+      case 'match_declined':
+        return Icons.sync_rounded;
       case 'match_found':
         return Icons.people_outline_rounded;
       default:
@@ -177,14 +188,36 @@ class _NotificationSettingsScreenState
                   ),
                   const Divider(height: 1),
                   SwitchListTile(
-                    value: prefs.matchFound,
-                    onChanged: prefsNotifier.toggleMatchFound,
+                    value: prefs.matchProposed,
+                    onChanged: prefsNotifier.toggleMatchProposed,
                     secondary: Icon(
-                      Icons.people_outline_rounded,
+                      Icons.person_search_rounded,
                       color: theme.colorScheme.primary,
                     ),
-                    title: const Text('Match Found'),
-                    subtitle: const Text('Notifications when you are paired in a new pod'),
+                    title: const Text('Match Proposals'),
+                    subtitle: const Text('Alerts when a new partner proposal is ready'),
+                  ),
+                  const Divider(height: 1),
+                  SwitchListTile(
+                    value: prefs.matchConfirmed,
+                    onChanged: prefsNotifier.toggleMatchConfirmed,
+                    secondary: Icon(
+                      Icons.celebration_rounded,
+                      color: theme.colorScheme.primary,
+                    ),
+                    title: const Text('Match Confirmed'),
+                    subtitle: const Text('Alerts when both partners accept a match'),
+                  ),
+                  const Divider(height: 1),
+                  SwitchListTile(
+                    value: prefs.matchDeclined,
+                    onChanged: prefsNotifier.toggleMatchDeclined,
+                    secondary: Icon(
+                      Icons.sync_rounded,
+                      color: theme.colorScheme.primary,
+                    ),
+                    title: const Text('Match Updates'),
+                    subtitle: const Text('Alerts when searching resumes after a declined match'),
                   ),
                 ],
               ),

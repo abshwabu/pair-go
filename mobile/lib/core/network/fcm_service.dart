@@ -4,10 +4,12 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../router.dart';
 import '../storage/token_storage.dart';
 import 'api_client.dart';
 import '../../features/account/notification_preferences_provider.dart';
 import '../../features/auth/auth_state.dart';
+import '../../features/matching/matching_state_provider.dart';
 
 /// Service responsible for FCM device token registration, refresh handling,
 /// client-side push notification filtering based on user preferences, and logout.
@@ -112,6 +114,36 @@ class FcmService {
 
     if (kDebugMode) {
       debugPrint('FCM notification allowed for type: $type');
+    }
+
+    // Trigger immediate refresh when a matching notification arrives
+    if (type == 'match_proposed' ||
+        type == 'match_confirmed' ||
+        type == 'match_declined') {
+      _ref?.read(matchingStateProvider.notifier).refresh();
+    }
+  }
+
+  /// Handles tapping a push notification and routes through routeForState after a refresh.
+  Future<void> handleNotificationTap(
+    RemoteMessage message, {
+    void Function(String route, {Object? extra})? onNavigate,
+  }) async {
+    final type = message.data['type'] as String?;
+    final podId = message.data['pod_id'] as String?;
+
+    if (type == 'match_proposed' ||
+        type == 'match_confirmed' ||
+        type == 'match_declined') {
+      final latest = await _ref?.read(matchingStateProvider.notifier).refresh();
+      if (latest != null) {
+        if (type == 'match_confirmed') {
+          onNavigate?.call(AppRoutes.matchConfirmedPath, extra: podId ?? latest.podId);
+        } else {
+          final target = routeForState(latest, inMatchingFlow: true);
+          onNavigate?.call(target, extra: latest.podId);
+        }
+      }
     }
   }
 

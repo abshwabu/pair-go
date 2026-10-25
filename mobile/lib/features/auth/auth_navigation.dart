@@ -5,11 +5,12 @@ import '../../core/network/api_client.dart';
 import '../../core/network/fcm_service.dart';
 import '../../core/router.dart';
 import '../../core/storage/token_storage.dart';
+import '../matching/matching_state_provider.dart';
+import '../matching/models/matching_state_model.dart';
 import 'models/user_model.dart';
 
-/// Validates session via /auth/me and checks /pods:
-/// - Routes to pod-home if an active pod exists
-/// - Routes to goal-category if no active pod exists
+/// Validates session via /auth/me and checks matching state via /matching/current:
+/// - Uses routeForState so killing and reopening the app resumes the right screen
 /// - Wipes token and routes to login if absent or invalid
 /// - Registers FCM token on successful authentication
 Future<void> navigatePostAuth({
@@ -37,17 +38,18 @@ Future<void> navigatePostAuth({
     // 2. Wire FCM token registration on app start after login
     (fcmService ?? FcmService()).registerFcmToken(apiClient: apiClient);
 
-    // 3. Check active pods via /pods
-    final podsRes = await apiClient.get<dynamic>('/pods');
-    final pods = podsRes.data;
-    final hasActivePod = pods is List && pods.isNotEmpty;
+    // 3. Inspect matching state via GET /api/v1/matching/current
+    MatchingStateModel matchingState;
+    try {
+      final matchRes =
+          await apiClient.get<Map<String, dynamic>>('/matching/current');
+      matchingState = MatchingStateModel.fromJson(matchRes.data);
+    } catch (_) {
+      matchingState = const MatchingStateModel(status: MatchingStatus.none);
+    }
 
     if (context.mounted) {
-      if (hasActivePod) {
-        context.go(AppRoutes.podHomePath);
-      } else {
-        context.go(AppRoutes.goalCategoryPath);
-      }
+      navigateForMatchingState(context, matchingState, inMatchingFlow: false);
     }
   } catch (_) {
     try {

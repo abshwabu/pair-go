@@ -8,7 +8,9 @@ import '../features/auth/login_screen.dart';
 import '../features/auth/signup_screen.dart';
 import '../features/auth/splash_screen.dart';
 import '../features/matching/finding_match_screen.dart';
-import '../features/matching/match_found_screen.dart';
+import '../features/matching/match_confirmed_screen.dart';
+import '../features/matching/match_pending_screen.dart';
+import '../features/matching/match_proposal_screen.dart';
 import '../features/onboarding/goal_category_screen.dart';
 import '../features/onboarding/goal_detail_screen.dart';
 import '../features/onboarding/matching_prefs_screen.dart';
@@ -40,6 +42,9 @@ class AppRoutes {
   static const String goalDetail = 'goal-detail';
   static const String matchingPrefs = 'matching-prefs';
   static const String findingMatch = 'finding-match';
+  static const String matchProposal = 'match-proposal';
+  static const String matchPending = 'match-pending';
+  static const String matchConfirmed = 'match-confirmed';
   static const String matchFound = 'match-found';
   static const String podHome = 'pod-home';
   static const String podSettings = 'pod-settings';
@@ -63,6 +68,9 @@ class AppRoutes {
   static const String goalDetailPath = '/goal-detail';
   static const String matchingPrefsPath = '/matching-prefs';
   static const String findingMatchPath = '/finding-match';
+  static const String matchProposalPath = '/match-proposal';
+  static const String matchPendingPath = '/match-pending';
+  static const String matchConfirmedPath = '/match-confirmed';
   static const String matchFoundPath = '/match-found';
   static const String podHomePath = '/pod-home';
   static const String podSettingsPath = '/pod-settings';
@@ -87,7 +95,9 @@ class AppRoutes {
     goalDetail,
     matchingPrefs,
     findingMatch,
-    matchFound,
+    matchProposal,
+    matchPending,
+    matchConfirmed,
     podHome,
     podSettings,
     todoList,
@@ -234,13 +244,33 @@ GoRouter createRouter({
         builder: (context, state) => const FindingMatchScreen(),
       ),
       GoRoute(
+        name: AppRoutes.matchProposal,
+        path: AppRoutes.matchProposalPath,
+        builder: (context, state) => const MatchProposalScreen(),
+      ),
+      GoRoute(
+        name: AppRoutes.matchPending,
+        path: AppRoutes.matchPendingPath,
+        builder: (context, state) => const MatchPendingScreen(),
+      ),
+      GoRoute(
+        name: AppRoutes.matchConfirmed,
+        path: AppRoutes.matchConfirmedPath,
+        builder: (context, state) {
+          final podId = state.extra as String? ??
+              state.uri.queryParameters['pod_id'] ??
+              state.uri.queryParameters['id'];
+          return MatchConfirmedScreen(podId: podId);
+        },
+      ),
+      GoRoute(
         name: AppRoutes.matchFound,
         path: AppRoutes.matchFoundPath,
         builder: (context, state) {
           final podId = state.extra as String? ??
               state.uri.queryParameters['pod_id'] ??
               state.uri.queryParameters['id'];
-          return MatchFoundScreen(podId: podId);
+          return MatchConfirmedScreen(podId: podId);
         },
       ),
       GoRoute(
