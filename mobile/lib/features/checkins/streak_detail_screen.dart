@@ -4,7 +4,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/router.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_radii.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_theme_extension.dart';
+import '../../core/theme/app_typography.dart';
 import '../../core/widgets/error_banner.dart';
 import '../auth/auth_state.dart';
 import '../pods/pod_state.dart';
@@ -58,6 +61,7 @@ class _StreakDetailScreenState extends ConsumerState<StreakDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final tokens = context.tokens;
     final currentUser = ref.watch(currentUserProvider);
     final activePod = ref.watch(activePodDetailProvider).pod;
 
@@ -103,7 +107,7 @@ class _StreakDetailScreenState extends ConsumerState<StreakDetailScreen> {
                   padding: const EdgeInsets.all(AppSpacing.md),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.errorContainer.withValues(alpha: 0.7),
-                    borderRadius: AppRadius.borderRadiusLg,
+                    borderRadius: AppRadius.borderRadiusCard,
                     border: Border.all(
                       color: theme.colorScheme.error.withValues(alpha: 0.3),
                     ),
@@ -122,7 +126,7 @@ class _StreakDetailScreenState extends ConsumerState<StreakDetailScreen> {
                           Expanded(
                             child: Text(
                               'Streak Paused',
-                              style: theme.textTheme.titleMedium?.copyWith(
+                              style: AppTypography.titleMedium.copyWith(
                                 fontWeight: FontWeight.bold,
                                 color: theme.colorScheme.onErrorContainer,
                               ),
@@ -133,7 +137,7 @@ class _StreakDetailScreenState extends ConsumerState<StreakDetailScreen> {
                       const SizedBox(height: AppSpacing.xs),
                       Text(
                         'Your streak was broken, but your record of ${streak.bestStreak} days remains intact! Start a fresh streak together today.',
-                        style: theme.textTheme.bodyMedium?.copyWith(
+                        style: AppTypography.bodyMedium.copyWith(
                           color: theme.colorScheme.onErrorContainer,
                         ),
                       ),
@@ -156,74 +160,77 @@ class _StreakDetailScreenState extends ConsumerState<StreakDetailScreen> {
               Row(
                 children: [
                   Expanded(
-                    child: Card(
-                      elevation: 0,
-                      color: theme.colorScheme.primaryContainer,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: AppRadius.borderRadiusLg,
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.lg),
-                        child: Column(
-                          children: [
-                            Icon(
-                              Icons.local_fire_department_rounded,
-                              size: 36,
-                              color: theme.colorScheme.primary,
-                            ),
-                            const SizedBox(height: AppSpacing.sm),
-                            Text(
-                              '${streak?.currentStreak ?? 0}',
-                              style: theme.textTheme.headlineLarge?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: theme.colorScheme.onPrimaryContainer,
-                              ),
-                            ),
-                            Text(
-                              'Current Streak',
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                color: theme.colorScheme.onPrimaryContainer
-                                    .withValues(alpha: 0.8),
-                              ),
-                            ),
-                          ],
+                    child: Container(
+                      padding: const EdgeInsets.all(AppSpacing.lg),
+                      decoration: BoxDecoration(
+                        color: tokens.flameBackground,
+                        borderRadius: AppRadius.borderRadiusCard,
+                        border: Border.all(
+                          color: tokens.flame.withValues(alpha: 0.3),
+                          width: 1.5,
                         ),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.local_fire_department_rounded,
+                            size: 38,
+                            color: tokens.flame,
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          Text(
+                            '${streak?.currentStreak ?? 0}',
+                            style: AppTypography.headlineLarge.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                          Text(
+                            'Current Streak',
+                            style: AppTypography.labelMedium.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.md),
                   Expanded(
-                    child: Card(
-                      elevation: 0,
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: AppRadius.borderRadiusLg,
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.lg),
-                        child: Column(
-                          children: [
-                            Icon(
-                              Icons.emoji_events_rounded,
-                              size: 36,
-                              color: theme.colorScheme.tertiary,
-                            ),
-                            const SizedBox(height: AppSpacing.sm),
-                            Text(
-                              '${streak?.bestStreak ?? 0}',
-                              style: theme.textTheme.headlineLarge?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: theme.colorScheme.onSurface,
-                              ),
-                            ),
-                            Text(
-                              'Best Streak',
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
+                    child: Container(
+                      padding: const EdgeInsets.all(AppSpacing.lg),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        borderRadius: AppRadius.borderRadiusCard,
+                        border: Border.all(
+                          color: theme.colorScheme.outlineVariant,
+                          width: 1.0,
                         ),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.emoji_events_rounded,
+                            size: 38,
+                            color: theme.colorScheme.primary,
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          Text(
+                            '${streak?.bestStreak ?? 0}',
+                            style: AppTypography.headlineLarge.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                          Text(
+                            'Best Streak',
+                            style: AppTypography.labelMedium.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -235,8 +242,8 @@ class _StreakDetailScreenState extends ConsumerState<StreakDetailScreen> {
               Card(
                 elevation: 0,
                 color: theme.colorScheme.surfaceContainerHighest,
-                shape: RoundedRectangleBorder(
-                  borderRadius: AppRadius.borderRadiusLg,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: AppRadius.borderRadiusCard,
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(AppSpacing.lg),
@@ -245,14 +252,15 @@ class _StreakDetailScreenState extends ConsumerState<StreakDetailScreen> {
                     children: [
                       Text(
                         'Today\'s Accountability',
-                        style: theme.textTheme.titleMedium?.copyWith(
+                        style: AppTypography.titleMedium.copyWith(
                           fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.onSurface,
                         ),
                       ),
                       const SizedBox(height: AppSpacing.xs),
                       Text(
                         'Streaks increase when both members complete their daily check-in (UTC).',
-                        style: theme.textTheme.bodySmall?.copyWith(
+                        style: AppTypography.bodySmall.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
@@ -293,14 +301,19 @@ class _StreakDetailScreenState extends ConsumerState<StreakDetailScreen> {
               ),
               const SizedBox(height: AppSpacing.xl),
 
+              // Calendar Heatmap & Legend Section
+              _buildHeatmapSection(context, streakState.history, theme, tokens),
+              const SizedBox(height: AppSpacing.xl),
+
               // 3. History List Header
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
                     'Check-in History',
-                    style: theme.textTheme.titleMedium?.copyWith(
+                    style: AppTypography.titleMedium.copyWith(
                       fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurface,
                     ),
                   ),
                   if (streakState.isLoadingHistory)
@@ -321,13 +334,16 @@ class _StreakDetailScreenState extends ConsumerState<StreakDetailScreen> {
                 Card(
                   elevation: 0,
                   color: theme.colorScheme.surfaceContainerHighest,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: AppRadius.borderRadiusCard,
+                  ),
                   child: Padding(
                     padding: const EdgeInsets.all(AppSpacing.xl),
                     child: Center(
                       child: Text(
                         'No check-ins recorded yet.\nCheck in today to start your streak!',
                         textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyMedium?.copyWith(
+                        style: AppTypography.bodyMedium.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
@@ -353,6 +369,112 @@ class _StreakDetailScreenState extends ConsumerState<StreakDetailScreen> {
     );
   }
 
+  Widget _buildHeatmapSection(
+    BuildContext context,
+    List<DailyCheckInItem> history,
+    ThemeData theme,
+    AppColorsExtension tokens,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: AppRadius.borderRadiusCard,
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.calendar_month_rounded,
+                size: 20,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Text(
+                'Activity Heatmap',
+                style: AppTypography.labelLarge.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          // Heatmap grid (last 14 days or available items)
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: List.generate(14, (idx) {
+              final item = idx < history.length ? history[idx] : null;
+              final both = item?.bothCheckedIn ?? false;
+              final one = (item != null && !both && item.memberIds.isNotEmpty);
+
+              Color cellColor = theme.colorScheme.surfaceContainerHigh;
+              if (both) {
+                cellColor = tokens.flame;
+              } else if (one) {
+                cellColor = tokens.warning;
+              }
+
+              return Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: cellColor,
+                  borderRadius: AppRadius.borderRadiusSm,
+                ),
+              );
+            }),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          // Legend
+          Row(
+            children: [
+              _buildLegendDot(tokens.flame, 'Both', theme),
+              const SizedBox(width: AppSpacing.md),
+              _buildLegendDot(tokens.warning, 'Partial', theme),
+              const SizedBox(width: AppSpacing.md),
+              _buildLegendDot(
+                theme.colorScheme.surfaceContainerHigh,
+                'None',
+                theme,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLegendDot(Color color, String label, ThemeData theme) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.xxs),
+        Text(
+          label,
+          style: AppTypography.labelSmall.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontSize: 11,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildMemberStatusTile(
     BuildContext context, {
     required String title,
@@ -373,8 +495,9 @@ class _StreakDetailScreenState extends ConsumerState<StreakDetailScreen> {
         const SizedBox(width: AppSpacing.sm),
         Text(
           title,
-          style: theme.textTheme.bodyMedium?.copyWith(
+          style: AppTypography.bodyMedium.copyWith(
             fontWeight: FontWeight.w500,
+            color: theme.colorScheme.onSurface,
           ),
         ),
         const Spacer(),
@@ -391,7 +514,7 @@ class _StreakDetailScreenState extends ConsumerState<StreakDetailScreen> {
           ),
           child: Text(
             isCheckedIn ? 'Checked in' : 'Pending',
-            style: theme.textTheme.labelSmall?.copyWith(
+            style: AppTypography.labelSmall.copyWith(
               color: isCheckedIn
                   ? theme.colorScheme.onPrimaryContainer
                   : theme.colorScheme.onSurfaceVariant,
@@ -419,7 +542,7 @@ class _StreakDetailScreenState extends ConsumerState<StreakDetailScreen> {
         color: bothCompleted
             ? theme.colorScheme.primaryContainer.withValues(alpha: 0.4)
             : theme.colorScheme.surfaceContainerHighest,
-        borderRadius: AppRadius.borderRadiusMd,
+        borderRadius: AppRadius.borderRadiusCard,
         border: Border.all(
           color: bothCompleted
               ? theme.colorScheme.primary.withValues(alpha: 0.3)
@@ -444,15 +567,16 @@ class _StreakDetailScreenState extends ConsumerState<StreakDetailScreen> {
               children: [
                 Text(
                   item.date,
-                  style: theme.textTheme.bodyMedium?.copyWith(
+                  style: AppTypography.bodyMedium.copyWith(
                     fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onSurface,
                   ),
                 ),
                 Text(
                   bothCompleted
                       ? 'Both members completed check-in'
                       : '1 member completed check-in',
-                  style: theme.textTheme.bodySmall?.copyWith(
+                  style: AppTypography.bodySmall.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
@@ -472,7 +596,7 @@ class _StreakDetailScreenState extends ConsumerState<StreakDetailScreen> {
             ),
             child: Text(
               bothCompleted ? 'Both Completed' : '1 of 2',
-              style: theme.textTheme.labelSmall?.copyWith(
+              style: AppTypography.labelSmall.copyWith(
                 fontWeight: FontWeight.bold,
                 color: bothCompleted
                     ? theme.colorScheme.onPrimaryContainer

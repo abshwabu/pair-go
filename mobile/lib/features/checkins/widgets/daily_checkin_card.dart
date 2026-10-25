@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_radii.dart';
+import '../../../core/theme/app_spacing.dart';
+import '../../../core/theme/app_theme_extension.dart';
+import '../../../core/theme/app_typography.dart';
 import '../streak_provider.dart';
 import 'checkin_modal.dart';
 
@@ -20,6 +23,7 @@ class DailyCheckinCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final tokens = context.tokens;
     final streakState = ref.watch(podStreakProvider(podId));
 
     if (!streakState.shouldShowDailyPrompt) {
@@ -38,16 +42,24 @@ class DailyCheckinCard extends ConsumerWidget {
       child: Container(
         margin: const EdgeInsets.only(bottom: AppSpacing.md),
         decoration: BoxDecoration(
-          color: theme.colorScheme.primaryContainer.withValues(alpha: 0.6),
-          borderRadius: AppRadius.borderRadiusLg,
+          color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
+          borderRadius: AppRadius.borderRadiusCard,
           border: Border.all(
             color: theme.colorScheme.primary.withValues(alpha: 0.25),
+            width: 1.5,
           ),
+          boxShadow: [
+            BoxShadow(
+              color: theme.colorScheme.primary.withValues(alpha: 0.08),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Material(
           color: theme.colorScheme.surface.withValues(alpha: 0.0),
           child: InkWell(
-            borderRadius: AppRadius.borderRadiusLg,
+            borderRadius: AppRadius.borderRadiusCard,
             onTap: () {
               CheckInModal.show(
                 context,
@@ -61,15 +73,19 @@ class DailyCheckinCard extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(AppSpacing.sm),
+                    width: 44,
+                    height: 44,
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.primary,
+                      color: tokens.flameBackground,
                       shape: BoxShape.circle,
+                      border: Border.all(
+                        color: tokens.flame.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: Icon(
-                      Icons.flag_rounded,
-                      color: theme.colorScheme.onPrimary,
-                      size: 20,
+                      Icons.local_fire_department_rounded,
+                      color: tokens.flame,
+                      size: 24,
                     ),
                   ),
                   const SizedBox(width: AppSpacing.md),
@@ -81,9 +97,9 @@ class DailyCheckinCard extends ConsumerWidget {
                           children: [
                             Text(
                               'Daily Check-in',
-                              style: theme.textTheme.titleSmall?.copyWith(
+                              style: AppTypography.titleMedium.copyWith(
                                 fontWeight: FontWeight.bold,
-                                color: theme.colorScheme.onPrimaryContainer,
+                                color: theme.colorScheme.onSurface,
                               ),
                             ),
                             const Spacer(),
@@ -94,8 +110,7 @@ class DailyCheckinCard extends ConsumerWidget {
                               icon: Icon(
                                 Icons.close_rounded,
                                 size: 18,
-                                color: theme.colorScheme.onPrimaryContainer
-                                    .withValues(alpha: 0.6),
+                                color: theme.colorScheme.onSurfaceVariant,
                               ),
                               tooltip: 'Dismiss',
                               onPressed: () {
@@ -111,9 +126,8 @@ class DailyCheckinCard extends ConsumerWidget {
                           partnerDone
                               ? '$partner already checked in! Complete yours to advance your streak.'
                               : 'Keep your streak alive. Tap to log your progress for today.',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onPrimaryContainer
-                                .withValues(alpha: 0.9),
+                          style: AppTypography.bodySmall.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
                         const SizedBox(height: AppSpacing.sm),
@@ -121,7 +135,7 @@ class DailyCheckinCard extends ConsumerWidget {
                           children: [
                             Text(
                               'Tap to check in',
-                              style: theme.textTheme.labelMedium?.copyWith(
+                              style: AppTypography.labelMedium.copyWith(
                                 fontWeight: FontWeight.bold,
                                 color: theme.colorScheme.primary,
                               ),

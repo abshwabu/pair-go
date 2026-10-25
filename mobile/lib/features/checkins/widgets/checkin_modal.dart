@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
-import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_radii.dart';
+import '../../../core/theme/app_spacing.dart';
+import '../../../core/theme/app_theme_extension.dart';
+import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/error_banner.dart';
 import '../streak_provider.dart';
 
@@ -52,6 +56,7 @@ class _CheckInModalState extends ConsumerState<CheckInModal> {
   }
 
   Future<void> _handleConfirmCheckIn() async {
+    HapticFeedback.mediumImpact();
     final apiClient = ref.read(apiClientProvider);
     final note = _noteController.text.trim();
 
@@ -60,6 +65,7 @@ class _CheckInModalState extends ConsumerState<CheckInModal> {
         .checkIn(apiClient, note: note.isNotEmpty ? note : null);
 
     if (success && mounted) {
+      HapticFeedback.lightImpact();
       Navigator.of(context).pop(true);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -73,8 +79,10 @@ class _CheckInModalState extends ConsumerState<CheckInModal> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final tokens = context.tokens;
     final streakState = ref.watch(podStreakProvider(widget.podId));
     final partnerName = widget.partnerName ?? 'partner';
+    final partnerDone = streakState.streak?.partnerCheckedInToday ?? false;
 
     return Padding(
       padding: EdgeInsets.only(
@@ -101,19 +109,23 @@ class _CheckInModalState extends ConsumerState<CheckInModal> {
                 ),
               ),
 
-              // Title Row
+              // Title Row with flame badge
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(AppSpacing.sm),
+                    width: 48,
+                    height: 48,
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.primaryContainer,
+                      color: tokens.flameBackground,
                       shape: BoxShape.circle,
+                      border: Border.all(
+                        color: tokens.flame.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: Icon(
-                      Icons.check_circle_rounded,
-                      color: theme.colorScheme.primary,
-                      size: 26,
+                      Icons.local_fire_department_rounded,
+                      color: tokens.flame,
+                      size: 28,
                     ),
                   ),
                   const SizedBox(width: AppSpacing.md),
@@ -123,13 +135,14 @@ class _CheckInModalState extends ConsumerState<CheckInModal> {
                       children: [
                         Text(
                           'Daily Check-in',
-                          style: theme.textTheme.titleLarge?.copyWith(
+                          style: AppTypography.titleLarge.copyWith(
                             fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.onSurface,
                           ),
                         ),
                         Text(
                           'Log today\'s progress with $partnerName',
-                          style: theme.textTheme.bodySmall?.copyWith(
+                          style: AppTypography.bodySmall.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
@@ -143,6 +156,44 @@ class _CheckInModalState extends ConsumerState<CheckInModal> {
                   ),
                 ],
               ),
+
+              // Partner checked in badge
+              if (partnerDone) ...[
+                const SizedBox(height: AppSpacing.md),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.sm,
+                  ),
+                  decoration: BoxDecoration(
+                    color: tokens.success.withValues(alpha: 0.12),
+                    borderRadius: AppRadius.borderRadiusMd,
+                    border: Border.all(
+                      color: tokens.success.withValues(alpha: 0.25),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.check_circle_rounded,
+                        color: tokens.success,
+                        size: 18,
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Text(
+                          'Your partner checked in, your turn!',
+                          style: AppTypography.labelMedium.copyWith(
+                            color: tokens.success,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
               const SizedBox(height: AppSpacing.md),
 
               if (streakState.errorMessage != null) ...[
@@ -153,8 +204,9 @@ class _CheckInModalState extends ConsumerState<CheckInModal> {
               // Optional note text field
               Text(
                 'Note (optional)',
-                style: theme.textTheme.labelMedium?.copyWith(
+                style: AppTypography.labelMedium.copyWith(
                   fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: AppSpacing.xs),
@@ -163,13 +215,31 @@ class _CheckInModalState extends ConsumerState<CheckInModal> {
                 maxLength: 500,
                 maxLines: 3,
                 textCapitalization: TextCapitalization.sentences,
+                style: AppTypography.bodyMedium.copyWith(
+                  color: theme.colorScheme.onSurface,
+                ),
                 decoration: InputDecoration(
                   hintText: 'Share what you worked on today...',
                   filled: true,
                   fillColor: theme.colorScheme.surfaceContainerHighest,
                   border: OutlineInputBorder(
-                    borderRadius: AppRadius.borderRadiusMd,
-                    borderSide: BorderSide.none,
+                    borderRadius: AppRadius.borderRadiusInput,
+                    borderSide: BorderSide(
+                      color: theme.colorScheme.outlineVariant,
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: AppRadius.borderRadiusInput,
+                    borderSide: BorderSide(
+                      color: theme.colorScheme.outlineVariant,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: AppRadius.borderRadiusInput,
+                    borderSide: BorderSide(
+                      color: theme.colorScheme.primary,
+                      width: 1.5,
+                    ),
                   ),
                   contentPadding: const EdgeInsets.all(AppSpacing.md),
                 ),
@@ -181,6 +251,12 @@ class _CheckInModalState extends ConsumerState<CheckInModal> {
                 children: [
                   Expanded(
                     child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: AppRadius.borderRadiusMd,
+                        ),
+                      ),
                       onPressed: streakState.isCheckingIn
                           ? null
                           : () => Navigator.of(context).pop(false),
@@ -191,6 +267,12 @@ class _CheckInModalState extends ConsumerState<CheckInModal> {
                   Expanded(
                     flex: 2,
                     child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: AppRadius.borderRadiusMd,
+                        ),
+                      ),
                       onPressed: streakState.isCheckingIn
                           ? null
                           : _handleConfirmCheckIn,

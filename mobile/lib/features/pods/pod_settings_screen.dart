@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/router.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_radii.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_typography.dart';
 import '../../core/widgets/error_banner.dart';
 import '../auth/auth_state.dart';
 import 'pod_state.dart';
@@ -44,9 +46,13 @@ class _PodSettingsScreenState extends ConsumerState<PodSettingsScreen> {
       builder: (dialogContext) {
         final theme = Theme.of(dialogContext);
         return AlertDialog(
+          shape: const RoundedRectangleBorder(
+            borderRadius: AppRadius.borderRadiusCard,
+          ),
           title: const Text('Leave Pod?'),
           content: Text(
             'Are you sure you want to leave this pod? You will be unpaired from $partnerName and can select a new goal.',
+            style: AppTypography.bodyMedium,
           ),
           actions: [
             TextButton(
@@ -115,9 +121,13 @@ class _PodSettingsScreenState extends ConsumerState<PodSettingsScreen> {
       builder: (dialogContext) {
         final theme = Theme.of(dialogContext);
         return AlertDialog(
+          shape: const RoundedRectangleBorder(
+            borderRadius: AppRadius.borderRadiusCard,
+          ),
           title: const Text('Block Partner?'),
           content: Text(
             'Are you sure you want to block $partnerName? You will immediately leave this pod and will never be paired with them again.',
+            style: AppTypography.bodyMedium,
           ),
           actions: [
             TextButton(
@@ -213,20 +223,26 @@ class _PodSettingsScreenState extends ConsumerState<PodSettingsScreen> {
             // Notifications Section
             Text(
               'NOTIFICATIONS',
-              style: theme.textTheme.labelMedium?.copyWith(
+              style: AppTypography.labelMedium.copyWith(
                 color: theme.colorScheme.primary,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.1,
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
-            Card(
-              elevation: 0,
-              color: theme.colorScheme.surfaceContainerHighest,
-              shape: RoundedRectangleBorder(
-                borderRadius: AppRadius.borderRadiusMd,
+            Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: AppRadius.borderRadiusCard,
+                border: Border.all(
+                  color: theme.colorScheme.outlineVariant,
+                ),
               ),
               child: SwitchListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.xs,
+                ),
                 value: _notificationsEnabled,
                 onChanged: _isPerformingAction
                     ? null
@@ -237,14 +253,14 @@ class _PodSettingsScreenState extends ConsumerState<PodSettingsScreen> {
                       },
                 title: Text(
                   'Push Notifications',
-                  style: theme.textTheme.bodyLarge?.copyWith(
+                  style: AppTypography.bodyLarge.copyWith(
                     fontWeight: FontWeight.w600,
                     color: theme.colorScheme.onSurface,
                   ),
                 ),
                 subtitle: Text(
                   'Receive updates for check-ins, todos, and chat messages',
-                  style: theme.textTheme.bodySmall?.copyWith(
+                  style: AppTypography.bodySmall.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
@@ -256,36 +272,51 @@ class _PodSettingsScreenState extends ConsumerState<PodSettingsScreen> {
             // Safety & Accountability Section
             Text(
               'SAFETY & ACCOUNTABILITY',
-              style: theme.textTheme.labelMedium?.copyWith(
+              style: AppTypography.labelMedium.copyWith(
                 color: theme.colorScheme.primary,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.1,
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
-            Card(
-              elevation: 0,
-              color: theme.colorScheme.surfaceContainerHighest,
-              shape: RoundedRectangleBorder(
-                borderRadius: AppRadius.borderRadiusMd,
+            Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: AppRadius.borderRadiusCard,
+                border: Border.all(
+                  color: theme.colorScheme.outlineVariant,
+                ),
               ),
               child: Column(
                 children: [
                   ListTile(
-                    leading: Icon(
-                      Icons.flag_outlined,
-                      color: theme.colorScheme.error,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.xs,
+                    ),
+                    leading: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.error.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.flag_outlined,
+                        color: theme.colorScheme.error,
+                        size: 20,
+                      ),
                     ),
                     title: Text(
                       'Report Partner',
-                      style: theme.textTheme.bodyLarge?.copyWith(
+                      style: AppTypography.bodyLarge.copyWith(
                         fontWeight: FontWeight.w600,
                         color: theme.colorScheme.error,
                       ),
                     ),
                     subtitle: Text(
                       'Report inappropriate behavior or safety concerns',
-                      style: theme.textTheme.bodySmall?.copyWith(
+                      style: AppTypography.bodySmall.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
@@ -307,20 +338,33 @@ class _PodSettingsScreenState extends ConsumerState<PodSettingsScreen> {
                   ),
                   const Divider(height: 1),
                   ListTile(
-                    leading: Icon(
-                      Icons.block_rounded,
-                      color: theme.colorScheme.error,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.xs,
+                    ),
+                    leading: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.error.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.block_rounded,
+                        color: theme.colorScheme.error,
+                        size: 20,
+                      ),
                     ),
                     title: Text(
                       'Block Partner',
-                      style: theme.textTheme.bodyLarge?.copyWith(
+                      style: AppTypography.bodyLarge.copyWith(
                         fontWeight: FontWeight.w600,
                         color: theme.colorScheme.error,
                       ),
                     ),
                     subtitle: Text(
                       'Block $partnerName and leave this pod immediately',
-                      style: theme.textTheme.bodySmall?.copyWith(
+                      style: AppTypography.bodySmall.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
@@ -341,34 +385,49 @@ class _PodSettingsScreenState extends ConsumerState<PodSettingsScreen> {
             // Pod Membership Section
             Text(
               'POD MEMBERSHIP',
-              style: theme.textTheme.labelMedium?.copyWith(
+              style: AppTypography.labelMedium.copyWith(
                 color: theme.colorScheme.primary,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.1,
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
-            Card(
-              elevation: 0,
-              color: theme.colorScheme.surfaceContainerHighest,
-              shape: RoundedRectangleBorder(
-                borderRadius: AppRadius.borderRadiusMd,
+            Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: AppRadius.borderRadiusCard,
+                border: Border.all(
+                  color: theme.colorScheme.outlineVariant,
+                ),
               ),
               child: ListTile(
-                leading: Icon(
-                  Icons.exit_to_app_rounded,
-                  color: theme.colorScheme.error,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.xs,
+                ),
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.error.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.exit_to_app_rounded,
+                    color: theme.colorScheme.error,
+                    size: 20,
+                  ),
                 ),
                 title: Text(
                   'Leave Pod',
-                  style: theme.textTheme.bodyLarge?.copyWith(
+                  style: AppTypography.bodyLarge.copyWith(
                     fontWeight: FontWeight.w600,
                     color: theme.colorScheme.error,
                   ),
                 ),
                 subtitle: Text(
                   'Unpair and return to goal selection to find a new match',
-                  style: theme.textTheme.bodySmall?.copyWith(
+                  style: AppTypography.bodySmall.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),

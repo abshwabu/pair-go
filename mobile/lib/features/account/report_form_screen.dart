@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/network/api_client.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_radii.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_typography.dart';
 import '../../core/widgets/error_banner.dart';
 
 class ReportFormScreen extends ConsumerStatefulWidget {
@@ -74,11 +76,17 @@ class _ReportFormScreenState extends ConsumerState<ReportFormScreen> {
         context: context,
         barrierDismissible: false,
         builder: (dialogCtx) {
-          final theme = Theme.of(dialogCtx);
+          final dialogTheme = Theme.of(dialogCtx);
           return AlertDialog(
+            shape: const RoundedRectangleBorder(
+              borderRadius: AppRadius.borderRadiusCard,
+            ),
             title: Row(
               children: [
-                Icon(Icons.check_circle_outline_rounded, color: theme.colorScheme.primary),
+                Icon(
+                  Icons.check_circle_outline_rounded,
+                  color: dialogTheme.colorScheme.primary,
+                ),
                 const SizedBox(width: AppSpacing.sm),
                 const Text('Report Submitted'),
               ],
@@ -124,12 +132,18 @@ class _ReportFormScreenState extends ConsumerState<ReportFormScreen> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Submit Report'),
+        title: Text(
+          'Submit Report',
+          style: AppTypography.titleLarge.copyWith(fontWeight: FontWeight.bold),
+        ),
         elevation: 0,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSpacing.lg),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.md,
+          ),
           child: Form(
             key: _formKey,
             child: Column(
@@ -141,45 +155,54 @@ class _ReportFormScreenState extends ConsumerState<ReportFormScreen> {
                 ],
 
                 // Information Card
-                Card(
-                  elevation: 0,
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: AppRadius.borderRadiusMd,
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: AppRadius.borderRadiusCard,
+                    border: Border.all(
+                      color: theme.colorScheme.outlineVariant,
+                    ),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primaryContainer,
+                          borderRadius: AppRadius.borderRadiusMd,
+                        ),
+                        child: Icon(
                           Icons.security_rounded,
                           color: theme.colorScheme.primary,
-                          size: 24,
+                          size: 20,
                         ),
-                        const SizedBox(width: AppSpacing.md),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Confidential Report',
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Confidential Report',
+                              style: AppTypography.titleSmall.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onSurface,
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Reports are strictly confidential and will never be shared with the person you are reporting.',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Reports are strictly confidential and will never be shared with the person you are reporting.',
+                              style: AppTypography.bodySmall.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
 
@@ -187,16 +210,16 @@ class _ReportFormScreenState extends ConsumerState<ReportFormScreen> {
 
                 Text(
                   'REASON FOR REPORT',
-                  style: theme.textTheme.labelMedium?.copyWith(
+                  style: AppTypography.labelMedium.copyWith(
                     color: theme.colorScheme.primary,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 1.1,
                   ),
                 ),
-                const SizedBox(height: AppSpacing.xs),
+                const SizedBox(height: AppSpacing.xxs),
                 Text(
                   'Please describe what happened in detail (between 10 and 1000 characters).',
-                  style: theme.textTheme.bodySmall?.copyWith(
+                  style: AppTypography.bodySmall.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
@@ -208,9 +231,47 @@ class _ReportFormScreenState extends ConsumerState<ReportFormScreen> {
                   maxLength: 1000,
                   enabled: !_isSubmitting,
                   textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(
-                    hintText: 'Describe the inappropriate behavior, harassment, or safety concern...',
+                  style: AppTypography.bodyMedium,
+                  decoration: InputDecoration(
+                    hintText:
+                        'Describe the inappropriate behavior, harassment, or safety concern...',
+                    hintStyle: AppTypography.bodyMedium.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                     alignLabelWithHint: true,
+                    filled: true,
+                    fillColor: theme.colorScheme.surface,
+                    contentPadding: const EdgeInsets.all(AppSpacing.md),
+                    border: OutlineInputBorder(
+                      borderRadius: AppRadius.borderRadiusInput,
+                      borderSide: BorderSide(color: theme.colorScheme.outline),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: AppRadius.borderRadiusInput,
+                      borderSide: BorderSide(
+                        color: theme.colorScheme.outlineVariant,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: AppRadius.borderRadiusInput,
+                      borderSide: BorderSide(
+                        color: theme.colorScheme.primary,
+                        width: 2,
+                      ),
+                    ),
+                    errorBorder: OutlineInputBorder(
+                      borderRadius: AppRadius.borderRadiusInput,
+                      borderSide: BorderSide(
+                        color: theme.colorScheme.error,
+                      ),
+                    ),
+                    focusedErrorBorder: OutlineInputBorder(
+                      borderRadius: AppRadius.borderRadiusInput,
+                      borderSide: BorderSide(
+                        color: theme.colorScheme.error,
+                        width: 2,
+                      ),
+                    ),
                   ),
                   validator: (value) {
                     final trimmed = value?.trim() ?? '';
@@ -230,7 +291,10 @@ class _ReportFormScreenState extends ConsumerState<ReportFormScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: theme.colorScheme.error,
                     foregroundColor: theme.colorScheme.onError,
-                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                    minimumSize: const Size(double.infinity, 52),
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: AppRadius.borderRadiusMd,
+                    ),
                   ),
                   onPressed: _isSubmitting ? null : _submitReport,
                   child: _isSubmitting
@@ -242,11 +306,15 @@ class _ReportFormScreenState extends ConsumerState<ReportFormScreen> {
                             color: theme.colorScheme.onError,
                           ),
                         )
-                      : const Text(
+                      : Text(
                           'Submit Report',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                          style: AppTypography.labelLarge.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.onError,
+                          ),
                         ),
                 ),
+                const SizedBox(height: AppSpacing.xl),
               ],
             ),
           ),

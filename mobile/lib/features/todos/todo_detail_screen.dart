@@ -4,8 +4,13 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/router.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_radii.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_theme_extension.dart';
+import '../../core/theme/app_typography.dart';
+import '../../core/widgets/app_card.dart';
 import '../../core/widgets/error_banner.dart';
+import '../../core/widgets/status_chip.dart';
 import '../auth/auth_state.dart';
 import '../pods/pod_state.dart';
 import 'models/todo_model.dart';
@@ -43,9 +48,13 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
       builder: (dialogContext) {
         final theme = Theme.of(dialogContext);
         return AlertDialog(
+          shape: const RoundedRectangleBorder(
+            borderRadius: AppRadius.borderRadiusCard,
+          ),
           title: const Text('Delete Task?'),
-          content: const Text(
+          content: Text(
             'Are you sure you want to delete this task? This action cannot be undone.',
+            style: AppTypography.bodyMedium,
           ),
           actions: [
             TextButton(
@@ -96,6 +105,7 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final tokens = context.tokens;
     final currentUser = ref.watch(currentUserProvider);
     final activePod = ref.watch(activePodDetailProvider).pod;
 
@@ -183,119 +193,108 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
                 ),
 
               // Title and Completion Status Card
-              Card(
-                elevation: 0,
-                color: theme.colorScheme.surfaceContainerHighest,
-                shape: RoundedRectangleBorder(
-                  borderRadius: AppRadius.borderRadiusLg,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Transform.scale(
-                            scale: 1.2,
-                            child: Checkbox(
-                              value: todo.isDone,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: AppRadius.borderRadiusSm,
-                              ),
-                              onChanged: (val) async {
-                                final apiClient = ref.read(apiClientProvider);
-                                final ok = await ref
-                                    .read(podTodosProvider(resolvedPodId).notifier)
-                                    .toggleTodoOptimistic(
-                                      apiClient: apiClient,
-                                      todoId: todo.id,
-                                    );
-                                if (!ok && context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Failed to update task. Reverted.'),
-                                    ),
+              AppCard(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Transform.scale(
+                          scale: 1.25,
+                          child: Checkbox(
+                            value: todo.isDone,
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: AppRadius.borderRadiusSm,
+                            ),
+                            onChanged: (val) async {
+                              final apiClient = ref.read(apiClientProvider);
+                              final ok = await ref
+                                  .read(podTodosProvider(resolvedPodId).notifier)
+                                  .toggleTodoOptimistic(
+                                    apiClient: apiClient,
+                                    todoId: todo.id,
                                   );
-                                }
-                              },
-                            ),
+                              if (!ok && context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Failed to update task. Reverted.'),
+                                  ),
+                                );
+                              }
+                            },
                           ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  todo.title,
-                                  style: theme.textTheme.headlineSmall?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    decoration: todo.isDone
-                                        ? TextDecoration.lineThrough
-                                        : null,
-                                    color: todo.isDone
-                                        ? theme.colorScheme.onSurfaceVariant
-                                        : theme.colorScheme.onSurface,
-                                  ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                todo.title,
+                                style: AppTypography.headlineSmall.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  decoration: todo.isDone
+                                      ? TextDecoration.lineThrough
+                                      : null,
+                                  color: todo.isDone
+                                      ? theme.colorScheme.onSurfaceVariant
+                                      : theme.colorScheme.onSurface,
                                 ),
-                                const SizedBox(height: AppSpacing.xs),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: AppSpacing.sm,
-                                    vertical: AppSpacing.xs,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: todo.isDone
-                                        ? theme.colorScheme.primaryContainer
-                                        : theme.colorScheme.secondaryContainer,
-                                    borderRadius: AppRadius.borderRadiusSm,
-                                  ),
-                                  child: Text(
-                                    todo.isDone ? 'Completed' : 'In Progress',
-                                    style: theme.textTheme.labelSmall?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: todo.isDone
-                                          ? theme.colorScheme.onPrimaryContainer
-                                          : theme.colorScheme.onSecondaryContainer,
+                              ),
+                              const SizedBox(height: AppSpacing.xs),
+                              todo.isDone
+                                  ? const StatusChip.success(label: 'Completed')
+                                  : StatusChip.warning(
+                                      label: 'In Progress',
+                                      icon: Icons.hourglass_top_rounded,
                                     ),
-                                  ),
-                                ),
-                              ],
-                            ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ],
-                  ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
 
               const SizedBox(height: AppSpacing.lg),
 
               // Assignee & Due Date Meta Info
-              Card(
-                elevation: 0,
-                color: theme.colorScheme.surfaceContainerHighest,
-                shape: RoundedRectangleBorder(
-                  borderRadius: AppRadius.borderRadiusMd,
+              Container(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: AppRadius.borderRadiusCard,
+                  border: Border.all(
+                    color: theme.colorScheme.outlineVariant,
+                  ),
                 ),
                 child: Column(
                   children: [
                     ListTile(
-                      leading: Icon(
-                        assigneeIcon,
-                        color: theme.colorScheme.primary,
+                      leading: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primaryContainer,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          assigneeIcon,
+                          color: theme.colorScheme.primary,
+                          size: 20,
+                        ),
                       ),
                       title: Text(
                         'Assignee',
-                        style: theme.textTheme.labelSmall?.copyWith(
+                        style: AppTypography.labelSmall.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                       subtitle: Text(
                         assigneeText,
-                        style: theme.textTheme.bodyLarge?.copyWith(
+                        style: AppTypography.bodyLarge.copyWith(
                           fontWeight: FontWeight.w600,
                           color: theme.colorScheme.onSurface,
                         ),
@@ -303,13 +302,22 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
                     ),
                     const Divider(height: 1),
                     ListTile(
-                      leading: Icon(
-                        Icons.calendar_today_rounded,
-                        color: theme.colorScheme.primary,
+                      leading: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: tokens.flameBackground,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.calendar_today_rounded,
+                          color: tokens.flame,
+                          size: 20,
+                        ),
                       ),
                       title: Text(
                         'Due Date',
-                        style: theme.textTheme.labelSmall?.copyWith(
+                        style: AppTypography.labelSmall.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
@@ -317,7 +325,7 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
                         todo.dueDate != null && todo.dueDate!.isNotEmpty
                             ? todo.dueDate!
                             : 'No due date',
-                        style: theme.textTheme.bodyLarge?.copyWith(
+                        style: AppTypography.bodyLarge.copyWith(
                           fontWeight: FontWeight.w600,
                           color: theme.colorScheme.onSurface,
                         ),
@@ -332,36 +340,34 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
               // Notes Section
               Text(
                 'NOTES',
-                style: theme.textTheme.labelMedium?.copyWith(
+                style: AppTypography.labelMedium.copyWith(
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1.1,
                   color: theme.colorScheme.primary,
                 ),
               ),
               const SizedBox(height: AppSpacing.xs),
-              Card(
-                elevation: 0,
-                color: theme.colorScheme.surfaceContainerHighest,
-                shape: RoundedRectangleBorder(
-                  borderRadius: AppRadius.borderRadiusMd,
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: AppRadius.borderRadiusCard,
+                  border: Border.all(
+                    color: theme.colorScheme.outlineVariant,
+                  ),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: Text(
-                      todo.notes != null && todo.notes!.trim().isNotEmpty
-                          ? todo.notes!
-                          : 'No notes provided for this task.',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: todo.notes != null && todo.notes!.trim().isNotEmpty
-                            ? theme.colorScheme.onSurface
-                            : theme.colorScheme.onSurfaceVariant,
-                        fontStyle: todo.notes == null || todo.notes!.trim().isEmpty
-                            ? FontStyle.italic
-                            : FontStyle.normal,
-                      ),
-                    ),
+                child: Text(
+                  todo.notes != null && todo.notes!.trim().isNotEmpty
+                      ? todo.notes!
+                      : 'No notes provided for this task.',
+                  style: AppTypography.bodyMedium.copyWith(
+                    color: todo.notes != null && todo.notes!.trim().isNotEmpty
+                        ? theme.colorScheme.onSurface
+                        : theme.colorScheme.onSurfaceVariant,
+                    fontStyle: todo.notes == null || todo.notes!.trim().isEmpty
+                        ? FontStyle.italic
+                        : FontStyle.normal,
                   ),
                 ),
               ),
@@ -378,7 +384,7 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
                       if (todo.createdAt != null)
                         Text(
                           'Created on ${_formatDate(todo.createdAt)}',
-                          style: theme.textTheme.bodySmall?.copyWith(
+                          style: AppTypography.bodySmall.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
@@ -386,9 +392,9 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
                         const SizedBox(height: AppSpacing.xs),
                         Text(
                           'Completed on ${_formatDate(todo.completedAt)}',
-                          style: theme.textTheme.bodySmall?.copyWith(
+                          style: AppTypography.bodySmall.copyWith(
                             color: theme.colorScheme.primary,
-                            fontWeight: FontWeight.w500,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
@@ -432,7 +438,7 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
                     padding: const EdgeInsets.symmetric(
                       vertical: AppSpacing.md,
                     ),
-                    shape: RoundedRectangleBorder(
+                    shape: const RoundedRectangleBorder(
                       borderRadius: AppRadius.borderRadiusMd,
                     ),
                   ),

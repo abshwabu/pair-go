@@ -4,7 +4,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/router.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_radii.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_theme_extension.dart';
+import '../../core/theme/app_typography.dart';
 import '../auth/auth_state.dart';
 import '../pods/pod_state.dart';
 import 'streak_provider.dart';
@@ -58,6 +61,7 @@ class _StreakRecoveryScreenState extends ConsumerState<StreakRecoveryScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final tokens = context.tokens;
     final currentUser = ref.watch(currentUserProvider);
     final activePod = ref.watch(activePodDetailProvider).pod;
 
@@ -101,6 +105,7 @@ class _StreakRecoveryScreenState extends ConsumerState<StreakRecoveryScreen> {
             ? _buildBrokenStreakRecoveryView(
                 context,
                 theme: theme,
+                tokens: tokens,
                 streakState: streakState,
                 partnerName: partnerName,
                 podId: podId,
@@ -137,8 +142,9 @@ class _StreakRecoveryScreenState extends ConsumerState<StreakRecoveryScreen> {
           const SizedBox(height: AppSpacing.lg),
           Text(
             'Your Streak is Active!',
-            style: theme.textTheme.headlineMedium?.copyWith(
+            style: AppTypography.headlineMedium.copyWith(
               fontWeight: FontWeight.bold,
+              color: theme.colorScheme.onSurface,
             ),
             textAlign: TextAlign.center,
           ),
@@ -147,13 +153,18 @@ class _StreakRecoveryScreenState extends ConsumerState<StreakRecoveryScreen> {
             currentStreak > 0
                 ? 'You currently have a burning $currentStreak-day streak. Keep up the daily check-ins!'
                 : 'No streak record has been set yet. Check in with your partner today to begin!',
-            style: theme.textTheme.bodyMedium?.copyWith(
+            style: AppTypography.bodyMedium.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: AppSpacing.xl),
           FilledButton(
+            style: FilledButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: AppRadius.borderRadiusMd,
+              ),
+            ),
             onPressed: () {
               context.push(
                 AppRoutes.streakDetailPath,
@@ -171,6 +182,7 @@ class _StreakRecoveryScreenState extends ConsumerState<StreakRecoveryScreen> {
   Widget _buildBrokenStreakRecoveryView(
     BuildContext context, {
     required ThemeData theme,
+    required AppColorsExtension tokens,
     required PodStreakState streakState,
     required String partnerName,
     required String podId,
@@ -182,19 +194,37 @@ class _StreakRecoveryScreenState extends ConsumerState<StreakRecoveryScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Flame Illustration / Badge
+        // Warm illustration built from pure nested geometric shapes and flame
         Center(
-          child: Container(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.local_fire_department_rounded,
-              size: 56,
-              color: theme.colorScheme.primary,
-            ),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: tokens.flame.withValues(alpha: 0.08),
+                ),
+              ),
+              Container(
+                width: 90,
+                height: 90,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: tokens.flameBackground,
+                  border: Border.all(
+                    color: tokens.flame.withValues(alpha: 0.25),
+                    width: 1.5,
+                  ),
+                ),
+                child: Icon(
+                  Icons.local_fire_department_rounded,
+                  size: 48,
+                  color: tokens.flame,
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
@@ -202,15 +232,16 @@ class _StreakRecoveryScreenState extends ConsumerState<StreakRecoveryScreen> {
         // Encouraging Headline & Copy
         Text(
           'Let\'s Get Back on Track!',
-          style: theme.textTheme.headlineMedium?.copyWith(
+          style: AppTypography.headlineMedium.copyWith(
             fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
           ),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: AppSpacing.sm),
         Text(
           'Don\'t worry, every champion faces setbacks. You previously achieved an impressive streak of $bestStreak days! Team up with $partnerName to start a fresh streak today.',
-          style: theme.textTheme.bodyMedium?.copyWith(
+          style: AppTypography.bodyMedium.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
             height: 1.5,
           ),
@@ -219,43 +250,52 @@ class _StreakRecoveryScreenState extends ConsumerState<StreakRecoveryScreen> {
         const SizedBox(height: AppSpacing.xl),
 
         // Best Record Card
-        Card(
-          elevation: 0,
-          color: theme.colorScheme.surfaceContainerHighest,
-          shape: RoundedRectangleBorder(
-            borderRadius: AppRadius.borderRadiusLg,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.emoji_events_rounded,
-                  color: theme.colorScheme.tertiary,
-                  size: 28,
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Your Record to Beat',
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      Text(
-                        '$bestStreak Consecutive Days',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+        Container(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest,
+            borderRadius: AppRadius.borderRadiusCard,
+            border: Border.all(
+              color: theme.colorScheme.outlineVariant,
             ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.emoji_events_rounded,
+                  color: theme.colorScheme.primary,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Your Record to Beat',
+                      style: AppTypography.labelMedium.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    Text(
+                      '$bestStreak Consecutive Days',
+                      style: AppTypography.titleMedium.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
@@ -263,8 +303,9 @@ class _StreakRecoveryScreenState extends ConsumerState<StreakRecoveryScreen> {
         // Action Steps Section
         Text(
           'Two steps to restart your streak:',
-          style: theme.textTheme.titleSmall?.copyWith(
+          style: AppTypography.titleSmall.copyWith(
             fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
@@ -274,12 +315,12 @@ class _StreakRecoveryScreenState extends ConsumerState<StreakRecoveryScreen> {
           padding: const EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
             color: meCheckedIn
-                ? theme.colorScheme.primaryContainer.withValues(alpha: 0.3)
+                ? tokens.success.withValues(alpha: 0.12)
                 : theme.colorScheme.surfaceContainerHighest,
-            borderRadius: AppRadius.borderRadiusMd,
+            borderRadius: AppRadius.borderRadiusCard,
             border: Border.all(
               color: meCheckedIn
-                  ? theme.colorScheme.primary.withValues(alpha: 0.3)
+                  ? tokens.success.withValues(alpha: 0.3)
                   : theme.colorScheme.outlineVariant,
             ),
           ),
@@ -290,7 +331,7 @@ class _StreakRecoveryScreenState extends ConsumerState<StreakRecoveryScreen> {
                     ? Icons.check_circle_rounded
                     : Icons.radio_button_unchecked_rounded,
                 color: meCheckedIn
-                    ? theme.colorScheme.primary
+                    ? tokens.success
                     : theme.colorScheme.onSurfaceVariant,
               ),
               const SizedBox(width: AppSpacing.md),
@@ -300,15 +341,16 @@ class _StreakRecoveryScreenState extends ConsumerState<StreakRecoveryScreen> {
                   children: [
                     Text(
                       '1. Log your check-in today',
-                      style: theme.textTheme.bodyMedium?.copyWith(
+                      style: AppTypography.bodyMedium.copyWith(
                         fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                     Text(
                       meCheckedIn
                           ? 'You are checked in for today!'
                           : 'Record your progress for today.',
-                      style: theme.textTheme.bodySmall?.copyWith(
+                      style: AppTypography.bodySmall.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
@@ -317,6 +359,11 @@ class _StreakRecoveryScreenState extends ConsumerState<StreakRecoveryScreen> {
               ),
               if (!meCheckedIn)
                 FilledButton.tonal(
+                  style: FilledButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: AppRadius.borderRadiusMd,
+                    ),
+                  ),
                   onPressed: () {
                     CheckInModal.show(
                       context,
@@ -336,7 +383,7 @@ class _StreakRecoveryScreenState extends ConsumerState<StreakRecoveryScreen> {
           padding: const EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
             color: theme.colorScheme.surfaceContainerHighest,
-            borderRadius: AppRadius.borderRadiusMd,
+            borderRadius: AppRadius.borderRadiusCard,
             border: Border.all(
               color: theme.colorScheme.outlineVariant,
             ),
@@ -357,13 +404,14 @@ class _StreakRecoveryScreenState extends ConsumerState<StreakRecoveryScreen> {
                       children: [
                         Text(
                           '2. Nudge $partnerName',
-                          style: theme.textTheme.bodyMedium?.copyWith(
+                          style: AppTypography.bodyMedium.copyWith(
                             fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.onSurface,
                           ),
                         ),
                         Text(
                           'Send a push reminder to complete their check-in.',
-                          style: theme.textTheme.bodySmall?.copyWith(
+                          style: AppTypography.bodySmall.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
@@ -383,9 +431,9 @@ class _StreakRecoveryScreenState extends ConsumerState<StreakRecoveryScreen> {
                   ),
                   decoration: BoxDecoration(
                     color: streakState.nudgeSuccess == true
-                        ? theme.colorScheme.primaryContainer
+                        ? tokens.success.withValues(alpha: 0.15)
                         : (streakState.hasNudgeRateLimited
-                            ? theme.colorScheme.secondaryContainer
+                            ? tokens.warning.withValues(alpha: 0.15)
                             : theme.colorScheme.errorContainer),
                     borderRadius: AppRadius.borderRadiusSm,
                   ),
@@ -399,21 +447,21 @@ class _StreakRecoveryScreenState extends ConsumerState<StreakRecoveryScreen> {
                                 : Icons.error_outline_rounded),
                         size: 20,
                         color: streakState.nudgeSuccess == true
-                            ? theme.colorScheme.onPrimaryContainer
+                            ? tokens.success
                             : (streakState.hasNudgeRateLimited
-                                ? theme.colorScheme.onSecondaryContainer
+                                ? tokens.warning
                                 : theme.colorScheme.onErrorContainer),
                       ),
                       const SizedBox(width: AppSpacing.sm),
                       Expanded(
                         child: Text(
                           streakState.nudgeStatus!,
-                          style: theme.textTheme.bodySmall?.copyWith(
+                          style: AppTypography.bodySmall.copyWith(
                             fontWeight: FontWeight.w600,
                             color: streakState.nudgeSuccess == true
-                                ? theme.colorScheme.onPrimaryContainer
+                                ? tokens.success
                                 : (streakState.hasNudgeRateLimited
-                                    ? theme.colorScheme.onSecondaryContainer
+                                    ? tokens.warning
                                     : theme.colorScheme.onErrorContainer),
                           ),
                         ),
@@ -426,6 +474,12 @@ class _StreakRecoveryScreenState extends ConsumerState<StreakRecoveryScreen> {
 
               // Nudge button
               FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: AppRadius.borderRadiusMd,
+                  ),
+                ),
                 icon: streakState.isNudging
                     ? SizedBox(
                         width: 18,

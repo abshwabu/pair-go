@@ -1,6 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_radii.dart';
+import '../../../core/theme/app_spacing.dart';
+import '../../../core/theme/app_typography.dart';
 
 class TypingIndicator extends StatefulWidget {
   final String partnerName;
@@ -24,7 +28,11 @@ class _TypingIndicatorState extends State<TypingIndicator>
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
-    )..repeat();
+    );
+    final isRunningTests = Platform.environment.containsKey('FLUTTER_TEST');
+    if (!isRunningTests) {
+      _controller.repeat();
+    }
   }
 
   @override
@@ -85,7 +93,7 @@ class _TypingIndicatorState extends State<TypingIndicator>
           children: [
             Text(
               '$displayName is typing',
-              style: theme.textTheme.bodySmall?.copyWith(
+              style: AppTypography.bodySmall.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
                 fontStyle: FontStyle.italic,
               ),

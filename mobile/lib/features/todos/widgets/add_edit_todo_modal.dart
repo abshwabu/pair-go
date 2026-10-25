@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
-import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_radii.dart';
+import '../../../core/theme/app_spacing.dart';
+import '../../../core/theme/app_typography.dart';
 import '../models/todo_model.dart';
 import '../todos_provider.dart';
 
@@ -193,13 +195,26 @@ class _AddEditTodoModalState extends ConsumerState<AddEditTodoModal> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Handle Drag bar
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.outlineVariant,
+                    borderRadius: AppRadius.borderRadiusFull,
+                  ),
+                ),
+              ),
+
               // Header Row
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
                     isEditing ? 'Edit Task' : 'Add New Task',
-                    style: theme.textTheme.titleLarge?.copyWith(
+                    style: AppTypography.titleLarge.copyWith(
                       fontWeight: FontWeight.bold,
                       color: theme.colorScheme.onSurface,
                     ),
@@ -218,12 +233,33 @@ class _AddEditTodoModalState extends ConsumerState<AddEditTodoModal> {
                 controller: _titleController,
                 autofocus: !isEditing,
                 textCapitalization: TextCapitalization.sentences,
+                style: AppTypography.bodyMedium.copyWith(
+                  color: theme.colorScheme.onSurface,
+                ),
                 decoration: InputDecoration(
                   labelText: 'Task Title *',
                   hintText: 'e.g. Read 20 pages',
                   errorText: _titleError,
+                  filled: true,
+                  fillColor: theme.colorScheme.surfaceContainerHighest,
                   border: OutlineInputBorder(
-                    borderRadius: AppRadius.borderRadiusMd,
+                    borderRadius: AppRadius.borderRadiusInput,
+                    borderSide: BorderSide(
+                      color: theme.colorScheme.outlineVariant,
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: AppRadius.borderRadiusInput,
+                    borderSide: BorderSide(
+                      color: theme.colorScheme.outlineVariant,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: AppRadius.borderRadiusInput,
+                    borderSide: BorderSide(
+                      color: theme.colorScheme.primary,
+                      width: 1.5,
+                    ),
                   ),
                 ),
                 onChanged: (val) {
@@ -243,11 +279,32 @@ class _AddEditTodoModalState extends ConsumerState<AddEditTodoModal> {
                 maxLines: 3,
                 minLines: 2,
                 textCapitalization: TextCapitalization.sentences,
+                style: AppTypography.bodyMedium.copyWith(
+                  color: theme.colorScheme.onSurface,
+                ),
                 decoration: InputDecoration(
                   labelText: 'Notes (optional)',
                   hintText: 'Add details or context for your partner',
+                  filled: true,
+                  fillColor: theme.colorScheme.surfaceContainerHighest,
                   border: OutlineInputBorder(
-                    borderRadius: AppRadius.borderRadiusMd,
+                    borderRadius: AppRadius.borderRadiusInput,
+                    borderSide: BorderSide(
+                      color: theme.colorScheme.outlineVariant,
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: AppRadius.borderRadiusInput,
+                    borderSide: BorderSide(
+                      color: theme.colorScheme.outlineVariant,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: AppRadius.borderRadiusInput,
+                    borderSide: BorderSide(
+                      color: theme.colorScheme.primary,
+                      width: 1.5,
+                    ),
                   ),
                 ),
               ),
@@ -257,7 +314,7 @@ class _AddEditTodoModalState extends ConsumerState<AddEditTodoModal> {
               // Assignee Selector
               Text(
                 'ASSIGN TO',
-                style: theme.textTheme.labelMedium?.copyWith(
+                style: AppTypography.labelMedium.copyWith(
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1.1,
                   color: theme.colorScheme.primary,
@@ -298,18 +355,20 @@ class _AddEditTodoModalState extends ConsumerState<AddEditTodoModal> {
               // Due Date Selector
               Text(
                 'DUE DATE',
-                style: theme.textTheme.labelMedium?.copyWith(
+                style: AppTypography.labelMedium.copyWith(
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1.1,
                   color: theme.colorScheme.primary,
                 ),
               ),
               const SizedBox(height: AppSpacing.xs),
-              Card(
-                elevation: 0,
-                color: theme.colorScheme.surfaceContainerHighest,
-                shape: RoundedRectangleBorder(
-                  borderRadius: AppRadius.borderRadiusMd,
+              Container(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: AppRadius.borderRadiusCard,
+                  border: Border.all(
+                    color: theme.colorScheme.outlineVariant,
+                  ),
                 ),
                 child: ListTile(
                   leading: Icon(
@@ -318,7 +377,7 @@ class _AddEditTodoModalState extends ConsumerState<AddEditTodoModal> {
                   ),
                   title: Text(
                     _dueDate != null ? 'Due: $_dueDate' : 'No due date set',
-                    style: theme.textTheme.bodyMedium?.copyWith(
+                    style: AppTypography.bodyMedium.copyWith(
                       fontWeight: FontWeight.w500,
                       color: _dueDate != null
                           ? theme.colorScheme.onSurface
@@ -354,7 +413,7 @@ class _AddEditTodoModalState extends ConsumerState<AddEditTodoModal> {
                     padding: const EdgeInsets.symmetric(
                       vertical: AppSpacing.md,
                     ),
-                    shape: RoundedRectangleBorder(
+                    shape: const RoundedRectangleBorder(
                       borderRadius: AppRadius.borderRadiusMd,
                     ),
                   ),

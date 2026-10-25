@@ -4,7 +4,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/router.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_radii.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_typography.dart';
+import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/error_banner.dart';
 import 'in_app_notifications_provider.dart';
 import 'models/in_app_notification_model.dart';
@@ -122,108 +125,250 @@ class _NotificationSettingsScreenState
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Notifications'),
+        title: Text(
+          'Notifications',
+          style: AppTypography.titleLarge.copyWith(fontWeight: FontWeight.bold),
+        ),
         elevation: 0,
       ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.all(AppSpacing.lg),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.md,
+          ),
           children: [
             // Preference Toggles Section
             Text(
               'PUSH NOTIFICATION PREFERENCES',
-              style: theme.textTheme.labelMedium?.copyWith(
+              style: AppTypography.labelMedium.copyWith(
                 color: theme.colorScheme.primary,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.1,
               ),
             ),
-            const SizedBox(height: AppSpacing.xs),
+            const SizedBox(height: AppSpacing.xxs),
             Text(
               'Select which notifications trigger local alerts on your device.',
-              style: theme.textTheme.bodySmall?.copyWith(
+              style: AppTypography.bodySmall.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
-            Card(
-              elevation: 0,
-              color: theme.colorScheme.surfaceContainerHighest,
-              shape: RoundedRectangleBorder(
-                borderRadius: AppRadius.borderRadiusMd,
+            Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: AppRadius.borderRadiusCard,
+                border: Border.all(
+                  color: theme.colorScheme.outlineVariant,
+                ),
               ),
               child: Column(
                 children: [
                   SwitchListTile(
                     value: prefs.newMessage,
                     onChanged: prefsNotifier.toggleNewMessage,
-                    secondary: Icon(
-                      Icons.chat_bubble_outline_rounded,
-                      color: theme.colorScheme.primary,
+                    secondary: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer,
+                        borderRadius: AppRadius.borderRadiusMd,
+                      ),
+                      child: Icon(
+                        Icons.chat_bubble_outline_rounded,
+                        color: theme.colorScheme.primary,
+                        size: 20,
+                      ),
                     ),
-                    title: const Text('Chat Messages'),
-                    subtitle: const Text('Alerts when your partner sends a message'),
+                    title: Text(
+                      'Chat Messages',
+                      style: AppTypography.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Alerts when your partner sends a message',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                   ),
-                  const Divider(height: 1),
+                  Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: theme.colorScheme.outlineVariant,
+                  ),
                   SwitchListTile(
                     value: prefs.checkinNudge,
                     onChanged: prefsNotifier.toggleCheckinNudge,
-                    secondary: Icon(
-                      Icons.touch_app_outlined,
-                      color: theme.colorScheme.primary,
+                    secondary: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer,
+                        borderRadius: AppRadius.borderRadiusMd,
+                      ),
+                      child: Icon(
+                        Icons.touch_app_outlined,
+                        color: theme.colorScheme.primary,
+                        size: 20,
+                      ),
                     ),
-                    title: const Text('Check-in Nudges'),
-                    subtitle: const Text('Reminders when your partner nudges you'),
+                    title: Text(
+                      'Check-in Nudges',
+                      style: AppTypography.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Reminders when your partner nudges you',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                   ),
-                  const Divider(height: 1),
+                  Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: theme.colorScheme.outlineVariant,
+                  ),
                   SwitchListTile(
                     value: prefs.streakBroken,
                     onChanged: prefsNotifier.toggleStreakBroken,
-                    secondary: Icon(
-                      Icons.warning_amber_rounded,
-                      color: theme.colorScheme.primary,
+                    secondary: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer,
+                        borderRadius: AppRadius.borderRadiusMd,
+                      ),
+                      child: Icon(
+                        Icons.warning_amber_rounded,
+                        color: theme.colorScheme.primary,
+                        size: 20,
+                      ),
                     ),
-                    title: const Text('Streak Alerts'),
-                    subtitle: const Text('Warnings when a streak is in jeopardy or broken'),
+                    title: Text(
+                      'Streak Alerts',
+                      style: AppTypography.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Warnings when a streak is in jeopardy or broken',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                   ),
-                  const Divider(height: 1),
+                  Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: theme.colorScheme.outlineVariant,
+                  ),
                   SwitchListTile(
                     value: prefs.matchProposed,
                     onChanged: prefsNotifier.toggleMatchProposed,
-                    secondary: Icon(
-                      Icons.person_search_rounded,
-                      color: theme.colorScheme.primary,
+                    secondary: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer,
+                        borderRadius: AppRadius.borderRadiusMd,
+                      ),
+                      child: Icon(
+                        Icons.person_search_rounded,
+                        color: theme.colorScheme.primary,
+                        size: 20,
+                      ),
                     ),
-                    title: const Text('Match Proposals'),
-                    subtitle: const Text('Alerts when a new partner proposal is ready'),
+                    title: Text(
+                      'Match Proposals',
+                      style: AppTypography.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Alerts when a new partner proposal is ready',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                   ),
-                  const Divider(height: 1),
+                  Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: theme.colorScheme.outlineVariant,
+                  ),
                   SwitchListTile(
                     value: prefs.matchConfirmed,
                     onChanged: prefsNotifier.toggleMatchConfirmed,
-                    secondary: Icon(
-                      Icons.celebration_rounded,
-                      color: theme.colorScheme.primary,
+                    secondary: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer,
+                        borderRadius: AppRadius.borderRadiusMd,
+                      ),
+                      child: Icon(
+                        Icons.celebration_rounded,
+                        color: theme.colorScheme.primary,
+                        size: 20,
+                      ),
                     ),
-                    title: const Text('Match Confirmed'),
-                    subtitle: const Text('Alerts when both partners accept a match'),
+                    title: Text(
+                      'Match Confirmed',
+                      style: AppTypography.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Alerts when both partners accept a match',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                   ),
-                  const Divider(height: 1),
+                  Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: theme.colorScheme.outlineVariant,
+                  ),
                   SwitchListTile(
                     value: prefs.matchDeclined,
                     onChanged: prefsNotifier.toggleMatchDeclined,
-                    secondary: Icon(
-                      Icons.sync_rounded,
-                      color: theme.colorScheme.primary,
+                    secondary: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer,
+                        borderRadius: AppRadius.borderRadiusMd,
+                      ),
+                      child: Icon(
+                        Icons.sync_rounded,
+                        color: theme.colorScheme.primary,
+                        size: 20,
+                      ),
                     ),
-                    title: const Text('Match Updates'),
-                    subtitle: const Text('Alerts when searching resumes after a declined match'),
+                    title: Text(
+                      'Match Updates',
+                      style: AppTypography.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Alerts when searching resumes after a declined match',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: AppSpacing.xl),
+            const SizedBox(height: AppSpacing.xxl),
 
             // In-app Notifications List Section
             Row(
@@ -231,17 +376,20 @@ class _NotificationSettingsScreenState
               children: [
                 Text(
                   'IN-APP NOTIFICATIONS',
-                  style: theme.textTheme.labelMedium?.copyWith(
+                  style: AppTypography.labelMedium.copyWith(
                     color: theme.colorScheme.primary,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 1.1,
                   ),
                 ),
                 if (notifsState.isLoading)
-                  const SizedBox(
+                  SizedBox(
                     width: 16,
                     height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: theme.colorScheme.primary,
+                    ),
                   )
                 else
                   IconButton(
@@ -256,7 +404,7 @@ class _NotificationSettingsScreenState
                   ),
               ],
             ),
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.xs),
 
             if (notifsState.errorMessage != null) ...[
               ErrorBanner(message: notifsState.errorMessage!),
@@ -264,62 +412,57 @@ class _NotificationSettingsScreenState
             ],
 
             if (!notifsState.isLoading && notifsState.notifications.isEmpty)
-              Card(
-                elevation: 0,
-                color: theme.colorScheme.surfaceContainerHighest,
-                shape: RoundedRectangleBorder(
-                  borderRadius: AppRadius.borderRadiusMd,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.xl),
-                  child: Center(
-                    child: Column(
-                      children: [
-                        Icon(
-                          Icons.notifications_off_outlined,
-                          size: 48,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        Text(
-                          'No Notifications Yet',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.xs),
-                        Text(
-                          'Your updates and alerts will appear here.',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
+              Container(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: AppRadius.borderRadiusCard,
+                  border: Border.all(
+                    color: theme.colorScheme.outlineVariant,
                   ),
+                ),
+                padding: const EdgeInsets.all(AppSpacing.xxl),
+                child: EmptyState(
+                  icon: Icons.notifications_off_outlined,
+                  title: 'No Notifications Yet',
+                  message: 'Your updates and alerts will appear here.',
                 ),
               )
             else
-              Card(
-                elevation: 0,
-                color: theme.colorScheme.surfaceContainerHighest,
-                shape: RoundedRectangleBorder(
-                  borderRadius: AppRadius.borderRadiusMd,
+              Container(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: AppRadius.borderRadiusCard,
+                  border: Border.all(
+                    color: theme.colorScheme.outlineVariant,
+                  ),
                 ),
                 child: ListView.separated(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: notifsState.notifications.length,
-                  separatorBuilder: (context, index) => const Divider(height: 1),
+                  separatorBuilder: (context, index) => Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: theme.colorScheme.outlineVariant,
+                  ),
                   itemBuilder: (context, index) {
                     final notif = notifsState.notifications[index];
                     final isRead = notif.isRead;
 
                     return ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: isRead
-                            ? theme.colorScheme.surfaceContainer
-                            : theme.colorScheme.primaryContainer,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                        vertical: AppSpacing.xs,
+                      ),
+                      leading: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: isRead
+                              ? theme.colorScheme.surfaceContainerHigh
+                              : theme.colorScheme.primaryContainer,
+                          shape: BoxShape.circle,
+                        ),
                         child: Icon(
                           _iconForType(notif.type),
                           color: isRead
@@ -333,9 +476,10 @@ class _NotificationSettingsScreenState
                           Expanded(
                             child: Text(
                               notif.title,
-                              style: theme.textTheme.bodyMedium?.copyWith(
+                              style: AppTypography.bodyMedium.copyWith(
                                 fontWeight:
                                     isRead ? FontWeight.normal : FontWeight.bold,
+                                color: theme.colorScheme.onSurface,
                               ),
                             ),
                           ),
@@ -357,7 +501,7 @@ class _NotificationSettingsScreenState
                             const SizedBox(height: 2),
                             Text(
                               notif.body,
-                              style: theme.textTheme.bodySmall?.copyWith(
+                              style: AppTypography.bodySmall.copyWith(
                                 color: isRead
                                     ? theme.colorScheme.onSurfaceVariant
                                     : theme.colorScheme.onSurface,
@@ -367,14 +511,15 @@ class _NotificationSettingsScreenState
                           const SizedBox(height: 4),
                           Text(
                             _formatTimestamp(notif.createdAt),
-                            style: theme.textTheme.labelSmall?.copyWith(
+                            style: AppTypography.labelSmall.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ],
                       ),
-                      trailing: const Icon(
+                      trailing: Icon(
                         Icons.chevron_right_rounded,
+                        color: theme.colorScheme.onSurfaceVariant,
                         size: 20,
                       ),
                       onTap: () => _handleNotificationTap(notif),
@@ -382,6 +527,7 @@ class _NotificationSettingsScreenState
                   },
                 ),
               ),
+            const SizedBox(height: AppSpacing.xl),
           ],
         ),
       ),

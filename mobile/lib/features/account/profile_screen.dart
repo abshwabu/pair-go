@@ -6,7 +6,10 @@ import '../../core/network/api_client.dart';
 import '../../core/network/fcm_service.dart';
 import '../../core/router.dart';
 import '../../core/storage/token_storage.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_radii.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_typography.dart';
+import '../../core/widgets/app_avatar.dart';
 import '../../core/widgets/theme_mode_selector.dart';
 import '../auth/auth_state.dart';
 
@@ -28,6 +31,9 @@ class ProfileScreen extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogCtx) => AlertDialog(
+        shape: const RoundedRectangleBorder(
+          borderRadius: AppRadius.borderRadiusCard,
+        ),
         title: const Text('Log Out'),
         content: const Text('Are you sure you want to log out of Pair?'),
         actions: [
@@ -72,50 +78,46 @@ class ProfileScreen extends ConsumerWidget {
     final languageName = _languages[languageCode] ?? languageCode.toUpperCase();
     final avatarUrl = user?.avatarUrl;
 
-    ImageProvider? avatarImage;
-    if (avatarUrl != null && avatarUrl.isNotEmpty) {
-      avatarImage = NetworkImage(avatarUrl);
-    }
-
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Profile'),
+        title: Text(
+          'Profile',
+          style: AppTypography.titleLarge.copyWith(fontWeight: FontWeight.bold),
+        ),
         elevation: 0,
+        centerTitle: false,
       ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.all(AppSpacing.lg),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.md,
+          ),
           children: [
             // Avatar and Header Card
             Center(
               child: Column(
                 children: [
-                  CircleAvatar(
-                    radius: 54,
-                    backgroundColor: theme.colorScheme.primaryContainer,
-                    backgroundImage: avatarImage,
-                    child: avatarImage == null
-                        ? Icon(
-                            Icons.person_rounded,
-                            size: 56,
-                            color: theme.colorScheme.primary,
-                          )
-                        : null,
+                  AppAvatar(
+                    name: name,
+                    imageUrl: avatarUrl,
+                    size: AppAvatarSize.xl,
                   ),
                   const SizedBox(height: AppSpacing.md),
                   Text(
                     name,
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
+                    style: AppTypography.headlineMedium.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: theme.colorScheme.onSurface,
                     ),
                     textAlign: TextAlign.center,
                   ),
                   if (email.isNotEmpty) ...[
-                    const SizedBox(height: AppSpacing.xs),
+                    const SizedBox(height: AppSpacing.xxs),
                     Text(
                       email,
-                      style: theme.textTheme.bodyMedium?.copyWith(
+                      style: AppTypography.bodyMedium.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                       textAlign: TextAlign.center,
@@ -123,6 +125,15 @@ class ProfileScreen extends ConsumerWidget {
                   ],
                   const SizedBox(height: AppSpacing.md),
                   OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.lg,
+                        vertical: AppSpacing.sm,
+                      ),
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: AppRadius.borderRadiusLg,
+                      ),
+                    ),
                     onPressed: () {
                       context.push(
                         AppRoutes.profileSetupPath,
@@ -136,42 +147,86 @@ class ProfileScreen extends ConsumerWidget {
               ),
             ),
 
-            const SizedBox(height: AppSpacing.xl),
+            const SizedBox(height: AppSpacing.xxl),
 
             // Profile Details Section
             Text(
               'ACCOUNT DETAILS',
-              style: theme.textTheme.labelMedium?.copyWith(
+              style: AppTypography.labelMedium.copyWith(
                 color: theme.colorScheme.primary,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.1,
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
-            Card(
-              elevation: 0,
-              color: theme.colorScheme.surfaceContainerHighest,
-              shape: RoundedRectangleBorder(
-                borderRadius: AppRadius.borderRadiusMd,
+            Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: AppRadius.borderRadiusCard,
+                border: Border.all(
+                  color: theme.colorScheme.outlineVariant,
+                ),
               ),
               child: Column(
                 children: [
                   ListTile(
-                    leading: Icon(
-                      Icons.schedule_rounded,
-                      color: theme.colorScheme.primary,
+                    leading: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer,
+                        borderRadius: AppRadius.borderRadiusMd,
+                      ),
+                      child: Icon(
+                        Icons.schedule_rounded,
+                        color: theme.colorScheme.primary,
+                        size: 20,
+                      ),
                     ),
-                    title: const Text('Timezone'),
-                    subtitle: Text(timezone),
+                    title: Text(
+                      'Timezone',
+                      style: AppTypography.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      timezone,
+                      style: AppTypography.bodySmall.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                   ),
-                  const Divider(height: 1),
+                  Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: theme.colorScheme.outlineVariant,
+                  ),
                   ListTile(
-                    leading: Icon(
-                      Icons.language_rounded,
-                      color: theme.colorScheme.primary,
+                    leading: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer,
+                        borderRadius: AppRadius.borderRadiusMd,
+                      ),
+                      child: Icon(
+                        Icons.language_rounded,
+                        color: theme.colorScheme.primary,
+                        size: 20,
+                      ),
                     ),
-                    title: const Text('Language'),
-                    subtitle: Text(languageName),
+                    title: Text(
+                      'Language',
+                      style: AppTypography.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      languageName,
+                      style: AppTypography.bodySmall.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -182,65 +237,167 @@ class ProfileScreen extends ConsumerWidget {
             // Settings & Preferences Section
             Text(
               'SETTINGS & PREFERENCES',
-              style: theme.textTheme.labelMedium?.copyWith(
+              style: AppTypography.labelMedium.copyWith(
                 color: theme.colorScheme.primary,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.1,
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
-            Card(
-              elevation: 0,
-              color: theme.colorScheme.surfaceContainerHighest,
-              shape: RoundedRectangleBorder(
-                borderRadius: AppRadius.borderRadiusMd,
+            Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: AppRadius.borderRadiusCard,
+                border: Border.all(
+                  color: theme.colorScheme.outlineVariant,
+                ),
               ),
               child: Column(
                 children: [
                   ListTile(
-                    leading: Icon(
-                      Icons.palette_outlined,
-                      color: theme.colorScheme.primary,
+                    leading: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer,
+                        borderRadius: AppRadius.borderRadiusMd,
+                      ),
+                      child: Icon(
+                        Icons.palette_outlined,
+                        color: theme.colorScheme.primary,
+                        size: 20,
+                      ),
                     ),
-                    title: const Text('Theme'),
-                    subtitle: const Text('System, Light, or Dark'),
+                    title: Text(
+                      'Theme',
+                      style: AppTypography.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'System, Light, or Dark',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                     trailing: const ThemeModeSelector(isCompact: true),
                   ),
-                  const Divider(height: 1),
+                  Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: theme.colorScheme.outlineVariant,
+                  ),
                   ListTile(
-                    leading: Icon(
-                      Icons.notifications_outlined,
-                      color: theme.colorScheme.primary,
+                    leading: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer,
+                        borderRadius: AppRadius.borderRadiusMd,
+                      ),
+                      child: Icon(
+                        Icons.notifications_outlined,
+                        color: theme.colorScheme.primary,
+                        size: 20,
+                      ),
                     ),
-                    title: const Text('Notification Settings'),
-                    subtitle: const Text('Manage alerts & view notifications'),
-                    trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+                    title: Text(
+                      'Notification Settings',
+                      style: AppTypography.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Manage alerts & view notifications',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    trailing: Icon(
+                      Icons.chevron_right_rounded,
+                      color: theme.colorScheme.onSurfaceVariant,
+                      size: 20,
+                    ),
                     onTap: () {
                       context.push(AppRoutes.notificationSettingsPath);
                     },
                   ),
-                  const Divider(height: 1),
+                  Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: theme.colorScheme.outlineVariant,
+                  ),
                   ListTile(
-                    leading: Icon(
-                      Icons.block_rounded,
-                      color: theme.colorScheme.primary,
+                    leading: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer,
+                        borderRadius: AppRadius.borderRadiusMd,
+                      ),
+                      child: Icon(
+                        Icons.block_rounded,
+                        color: theme.colorScheme.primary,
+                        size: 20,
+                      ),
                     ),
-                    title: const Text('Blocked Users'),
-                    subtitle: const Text('Manage users you have blocked'),
-                    trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+                    title: Text(
+                      'Blocked Users',
+                      style: AppTypography.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Manage users you have blocked',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    trailing: Icon(
+                      Icons.chevron_right_rounded,
+                      color: theme.colorScheme.onSurfaceVariant,
+                      size: 20,
+                    ),
                     onTap: () {
                       context.push(AppRoutes.blockedUsersPath);
                     },
                   ),
-                  const Divider(height: 1),
+                  Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: theme.colorScheme.outlineVariant,
+                  ),
                   ListTile(
-                    leading: Icon(
-                      Icons.lock_outline_rounded,
-                      color: theme.colorScheme.primary,
+                    leading: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer,
+                        borderRadius: AppRadius.borderRadiusMd,
+                      ),
+                      child: Icon(
+                        Icons.lock_outline_rounded,
+                        color: theme.colorScheme.primary,
+                        size: 20,
+                      ),
                     ),
-                    title: const Text('Account Settings'),
-                    subtitle: const Text('Password & account termination'),
-                    trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+                    title: Text(
+                      'Account Settings',
+                      style: AppTypography.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Password & account termination',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    trailing: Icon(
+                      Icons.chevron_right_rounded,
+                      color: theme.colorScheme.onSurfaceVariant,
+                      size: 20,
+                    ),
                     onTap: () {
                       context.push(AppRoutes.accountSettingsPath);
                     },
@@ -249,19 +406,30 @@ class ProfileScreen extends ConsumerWidget {
               ),
             ),
 
-            const SizedBox(height: AppSpacing.xl),
+            const SizedBox(height: AppSpacing.xxl),
 
             // Log Out Button
             Center(
               child: TextButton.icon(
                 style: TextButton.styleFrom(
                   foregroundColor: theme.colorScheme.error,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg,
+                    vertical: AppSpacing.sm,
+                  ),
                 ),
                 onPressed: () => _handleLogout(context, ref),
                 icon: const Icon(Icons.logout_rounded),
-                label: const Text('Log Out'),
+                label: Text(
+                  'Log Out',
+                  style: AppTypography.labelLarge.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.error,
+                  ),
+                ),
               ),
             ),
+            const SizedBox(height: AppSpacing.xl),
           ],
         ),
       ),

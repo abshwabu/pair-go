@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/network/api_client.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_radii.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_typography.dart';
+import '../../core/widgets/app_avatar.dart';
+import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/error_banner.dart';
 import 'blocked_users_provider.dart';
 import 'models/blocked_user_model.dart';
@@ -30,6 +34,9 @@ class _BlockedUsersScreenState extends ConsumerState<BlockedUsersScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogCtx) => AlertDialog(
+        shape: const RoundedRectangleBorder(
+          borderRadius: AppRadius.borderRadiusCard,
+        ),
         title: Text('Unblock ${block.name}?'),
         content: Text(
           'Are you sure you want to unblock ${block.name}? They will be removed from your blocked list and may be matched with you in future pods.',
@@ -81,7 +88,10 @@ class _BlockedUsersScreenState extends ConsumerState<BlockedUsersScreen> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Blocked Users'),
+        title: Text(
+          'Blocked Users',
+          style: AppTypography.titleLarge.copyWith(fontWeight: FontWeight.bold),
+        ),
         elevation: 0,
       ),
       body: SafeArea(
@@ -91,7 +101,10 @@ class _BlockedUsersScreenState extends ConsumerState<BlockedUsersScreen> {
             await ref.read(blockedUsersProvider.notifier).loadBlocks(apiClient);
           },
           child: ListView(
-            padding: const EdgeInsets.all(AppSpacing.lg),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.md,
+            ),
             children: [
               if (state.errorMessage != null) ...[
                 ErrorBanner(message: state.errorMessage!),
@@ -99,106 +112,95 @@ class _BlockedUsersScreenState extends ConsumerState<BlockedUsersScreen> {
               ],
 
               if (state.isLoading && state.blocks.isEmpty)
-                const Center(
+                Center(
                   child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 40),
-                    child: CircularProgressIndicator(),
-                  ),
-                )
-              else if (state.blocks.isEmpty)
-                Card(
-                  elevation: 0,
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: AppRadius.borderRadiusMd,
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.xl),
-                    child: Center(
-                      child: Column(
-                        children: [
-                          Icon(
-                            Icons.block_outlined,
-                            size: 48,
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                          const SizedBox(height: AppSpacing.md),
-                          Text(
-                            'No Blocked Users',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.xs),
-                          Text(
-                            'Users you block will appear here. You can unblock them at any time.',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
+                    padding: const EdgeInsets.symmetric(vertical: 40),
+                    child: CircularProgressIndicator(
+                      color: theme.colorScheme.primary,
                     ),
                   ),
                 )
+              else if (state.blocks.isEmpty)
+                Container(
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: AppRadius.borderRadiusCard,
+                    border: Border.all(
+                      color: theme.colorScheme.outlineVariant,
+                    ),
+                  ),
+                  padding: const EdgeInsets.all(AppSpacing.xxl),
+                  child: EmptyState(
+                    icon: Icons.block_outlined,
+                    title: 'No Blocked Users',
+                    message:
+                        'Users you block will appear here. You can unblock them at any time.',
+                  ),
+                )
               else
-                Card(
-                  elevation: 0,
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: AppRadius.borderRadiusMd,
+                Container(
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: AppRadius.borderRadiusCard,
+                    border: Border.all(
+                      color: theme.colorScheme.outlineVariant,
+                    ),
                   ),
                   child: ListView.separated(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: state.blocks.length,
-                    separatorBuilder: (context, index) => const Divider(height: 1),
+                    separatorBuilder: (context, index) => Divider(
+                      height: 1,
+                      thickness: 1,
+                      color: theme.colorScheme.outlineVariant,
+                    ),
                     itemBuilder: (context, index) {
                       final block = state.blocks[index];
                       final isUnblocking = _unblockingId == block.id;
 
-                      ImageProvider? avatarImage;
-                      if (block.avatarUrl != null && block.avatarUrl!.isNotEmpty) {
-                        avatarImage = NetworkImage(block.avatarUrl!);
-                      }
-
                       return ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: theme.colorScheme.primaryContainer,
-                          backgroundImage: avatarImage,
-                          child: avatarImage == null
-                              ? Icon(
-                                  Icons.person_rounded,
-                                  color: theme.colorScheme.primary,
-                                )
-                              : null,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                          vertical: AppSpacing.xs,
+                        ),
+                        leading: AppAvatar(
+                          name: block.name,
+                          imageUrl: block.avatarUrl,
+                          size: AppAvatarSize.md,
                         ),
                         title: Text(
                           block.name,
-                          style: theme.textTheme.bodyLarge?.copyWith(
+                          style: AppTypography.bodyMedium.copyWith(
                             fontWeight: FontWeight.w600,
+                            color: theme.colorScheme.onSurface,
                           ),
                         ),
                         subtitle: block.createdAt != null
                             ? Text(
                                 'Blocked on ${block.createdAt!.year}-${block.createdAt!.month.toString().padLeft(2, '0')}-${block.createdAt!.day.toString().padLeft(2, '0')}',
-                                style: theme.textTheme.bodySmall?.copyWith(
+                                style: AppTypography.bodySmall.copyWith(
                                   color: theme.colorScheme.onSurfaceVariant,
                                 ),
                               )
                             : null,
                         trailing: isUnblocking
-                            ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                            ? SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: theme.colorScheme.primary,
+                                ),
                               )
                             : OutlinedButton(
                                 style: OutlinedButton.styleFrom(
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: AppSpacing.md,
                                     vertical: AppSpacing.xs,
+                                  ),
+                                  shape: const RoundedRectangleBorder(
+                                    borderRadius: AppRadius.borderRadiusLg,
                                   ),
                                 ),
                                 onPressed: () => _handleUnblock(block),
@@ -208,6 +210,7 @@ class _BlockedUsersScreenState extends ConsumerState<BlockedUsersScreen> {
                     },
                   ),
                 ),
+              const SizedBox(height: AppSpacing.xl),
             ],
           ),
         ),

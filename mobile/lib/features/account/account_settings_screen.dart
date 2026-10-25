@@ -92,12 +92,15 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogCtx) {
-        final theme = Theme.of(dialogCtx);
+        final dialogTheme = Theme.of(dialogCtx);
         return AlertDialog(
+          shape: const RoundedRectangleBorder(
+            borderRadius: AppRadius.borderRadiusCard,
+          ),
           title: Row(
             children: [
-              Icon(Icons.warning_amber_rounded, color: theme.colorScheme.error),
-              const SizedBox(width: 8),
+              Icon(Icons.warning_amber_rounded, color: dialogTheme.colorScheme.error),
+              const SizedBox(width: AppSpacing.sm),
               const Text('Delete Account?'),
             ],
           ),
@@ -111,8 +114,8 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
             ),
             FilledButton(
               style: FilledButton.styleFrom(
-                backgroundColor: theme.colorScheme.error,
-                foregroundColor: theme.colorScheme.onError,
+                backgroundColor: dialogTheme.colorScheme.error,
+                foregroundColor: dialogTheme.colorScheme.onError,
               ),
               onPressed: () => Navigator.of(dialogCtx).pop(true),
               child: const Text('Permanently Delete'),
@@ -161,57 +164,65 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final tokens = context.tokens;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Account Settings'),
+        title: Text(
+          'Account Settings',
+          style: AppTypography.titleLarge.copyWith(fontWeight: FontWeight.bold),
+        ),
         elevation: 0,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSpacing.lg),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.md,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Appearance Section
               Text(
                 'APPEARANCE',
-                style: theme.textTheme.labelMedium?.copyWith(
+                style: AppTypography.labelMedium.copyWith(
                   color: theme.colorScheme.primary,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1.1,
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),
-              Card(
-                elevation: 0,
-                color: theme.colorScheme.surfaceContainerHighest,
-                shape: const RoundedRectangleBorder(
-                  borderRadius: AppRadius.borderRadiusMd,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        'Theme Mode',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        'Choose between System, Light, or Dark theme appearance.',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      const ThemeModeSelector(),
-                    ],
+              Container(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: AppRadius.borderRadiusCard,
+                  border: Border.all(
+                    color: theme.colorScheme.outlineVariant,
                   ),
+                ),
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Theme Mode',
+                      style: AppTypography.titleMedium.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xxs),
+                    Text(
+                      'Choose between System, Light, or Dark theme appearance.',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    const ThemeModeSelector(),
+                  ],
                 ),
               ),
               const SizedBox(height: AppSpacing.xl),
@@ -219,185 +230,197 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
               // Change Password Section
               Text(
                 'SECURITY & CREDENTIALS',
-                style: theme.textTheme.labelMedium?.copyWith(
+                style: AppTypography.labelMedium.copyWith(
                   color: theme.colorScheme.primary,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1.1,
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),
-              Card(
-                elevation: 0,
-                color: theme.colorScheme.surfaceContainerHighest,
-                shape: RoundedRectangleBorder(
-                  borderRadius: AppRadius.borderRadiusMd,
+              Container(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: AppRadius.borderRadiusCard,
+                  border: Border.all(
+                    color: theme.colorScheme.outlineVariant,
+                  ),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  child: Form(
-                    key: _passwordFormKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(
-                          'Change Password',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: Form(
+                  key: _passwordFormKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'Change Password',
+                        style: AppTypography.titleMedium.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.onSurface,
                         ),
-                        const SizedBox(height: AppSpacing.xs),
-                        Text(
-                          'Updating your password will revoke all other active sessions for your account.',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
+                      ),
+                      const SizedBox(height: AppSpacing.xxs),
+                      Text(
+                        'Updating your password will revoke all other active sessions for your account.',
+                        style: AppTypography.bodySmall.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+
+                      if (_passwordError != null) ...[
+                        ErrorBanner(message: _passwordError!),
                         const SizedBox(height: AppSpacing.md),
-
-                        if (_passwordError != null) ...[
-                          ErrorBanner(message: _passwordError!),
-                          const SizedBox(height: AppSpacing.md),
-                        ],
-
-                        if (_passwordSuccess != null) ...[
-                          Container(
-                            padding: const EdgeInsets.all(AppSpacing.md),
-                            decoration: BoxDecoration(
-                              color: context.tokens.success.withValues(alpha: 0.1),
-                              borderRadius: AppRadius.borderRadiusSm,
-                              border: Border.all(
-                                color: context.tokens.success.withValues(alpha: 0.3),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.check_circle_rounded,
-                                  color: context.tokens.success,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: AppSpacing.sm),
-                                Expanded(
-                                  child: Text(
-                                    _passwordSuccess!,
-                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                      color: context.tokens.success,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.md),
-                        ],
-
-                        TextFormField(
-                          controller: _currentPasswordController,
-                          obscureText: _obscureCurrent,
-                          enabled: !_isChangingPassword,
-                          decoration: InputDecoration(
-                            labelText: 'Current Password',
-                            prefixIcon: const Icon(Icons.lock_outline_rounded),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscureCurrent
-                                    ? Icons.visibility_outlined
-                                    : Icons.visibility_off_outlined,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _obscureCurrent = !_obscureCurrent;
-                                });
-                              },
-                            ),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter your current password';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-
-                        TextFormField(
-                          controller: _newPasswordController,
-                          obscureText: _obscureNew,
-                          enabled: !_isChangingPassword,
-                          decoration: InputDecoration(
-                            labelText: 'New Password',
-                            prefixIcon: const Icon(Icons.vpn_key_outlined),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscureNew
-                                    ? Icons.visibility_outlined
-                                    : Icons.visibility_off_outlined,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _obscureNew = !_obscureNew;
-                                });
-                              },
-                            ),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter a new password';
-                            }
-                            if (value.length < 8) {
-                              return 'Password must be at least 8 characters long';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-
-                        TextFormField(
-                          controller: _confirmPasswordController,
-                          obscureText: _obscureConfirm,
-                          enabled: !_isChangingPassword,
-                          decoration: InputDecoration(
-                            labelText: 'Confirm New Password',
-                            prefixIcon: const Icon(Icons.vpn_key_outlined),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscureConfirm
-                                    ? Icons.visibility_outlined
-                                    : Icons.visibility_off_outlined,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _obscureConfirm = !_obscureConfirm;
-                                });
-                              },
-                            ),
-                          ),
-                          validator: (value) {
-                            if (value != _newPasswordController.text) {
-                              return 'Passwords do not match';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-
-                        ElevatedButton(
-                          onPressed:
-                              _isChangingPassword ? null : _handleChangePassword,
-                          child: _isChangingPassword
-                              ? SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: theme.colorScheme.onPrimary,
-                                  ),
-                                )
-                              : const Text('Update Password'),
-                        ),
                       ],
-                    ),
+
+                      if (_passwordSuccess != null) ...[
+                        Container(
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          decoration: BoxDecoration(
+                            color: tokens.success.withValues(alpha: 0.1),
+                            borderRadius: AppRadius.borderRadiusSm,
+                            border: Border.all(
+                              color: tokens.success.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.check_circle_rounded,
+                                color: tokens.success,
+                                size: 20,
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: Text(
+                                  _passwordSuccess!,
+                                  style: AppTypography.bodyMedium.copyWith(
+                                    color: tokens.success,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                      ],
+
+                      TextFormField(
+                        controller: _currentPasswordController,
+                        obscureText: _obscureCurrent,
+                        enabled: !_isChangingPassword,
+                        decoration: InputDecoration(
+                          labelText: 'Current Password',
+                          prefixIcon: const Icon(Icons.lock_outline_rounded),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscureCurrent
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _obscureCurrent = !_obscureCurrent;
+                              });
+                            },
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter your current password';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+
+                      TextFormField(
+                        controller: _newPasswordController,
+                        obscureText: _obscureNew,
+                        enabled: !_isChangingPassword,
+                        decoration: InputDecoration(
+                          labelText: 'New Password',
+                          prefixIcon: const Icon(Icons.vpn_key_outlined),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscureNew
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _obscureNew = !_obscureNew;
+                              });
+                            },
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter a new password';
+                          }
+                          if (value.length < 8) {
+                            return 'Password must be at least 8 characters long';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+
+                      TextFormField(
+                        controller: _confirmPasswordController,
+                        obscureText: _obscureConfirm,
+                        enabled: !_isChangingPassword,
+                        decoration: InputDecoration(
+                          labelText: 'Confirm New Password',
+                          prefixIcon: const Icon(Icons.vpn_key_outlined),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscureConfirm
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _obscureConfirm = !_obscureConfirm;
+                              });
+                            },
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value != _newPasswordController.text) {
+                            return 'Passwords do not match';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 52),
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: AppRadius.borderRadiusMd,
+                          ),
+                        ),
+                        onPressed:
+                            _isChangingPassword ? null : _handleChangePassword,
+                        child: _isChangingPassword
+                            ? SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: theme.colorScheme.onPrimary,
+                                ),
+                              )
+                            : Text(
+                                'Update Password',
+                                style: AppTypography.labelLarge.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -407,79 +430,87 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
               // Danger Zone Section
               Text(
                 'DANGER ZONE',
-                style: theme.textTheme.labelMedium?.copyWith(
+                style: AppTypography.labelMedium.copyWith(
                   color: theme.colorScheme.error,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1.1,
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),
-              Card(
-                elevation: 0,
-                color: theme.colorScheme.errorContainer.withValues(alpha: 0.15),
-                shape: RoundedRectangleBorder(
-                  borderRadius: AppRadius.borderRadiusMd,
-                  side: BorderSide(
+              Container(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.errorContainer.withValues(alpha: 0.15),
+                  borderRadius: AppRadius.borderRadiusCard,
+                  border: Border.all(
                     color: theme.colorScheme.error.withValues(alpha: 0.4),
                   ),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.delete_forever_rounded,
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.delete_forever_rounded,
+                          color: theme.colorScheme.error,
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Text(
+                          'Delete Account',
+                          style: AppTypography.titleMedium.copyWith(
                             color: theme.colorScheme.error,
+                            fontWeight: FontWeight.bold,
                           ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Text(
-                            'Delete Account',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              color: theme.colorScheme.error,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        'Permanently delete your Pair account, dissolve any active pods, and delete all authentication tokens. This cannot be undone.',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
                         ),
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-
-                      if (_deleteError != null) ...[
-                        ErrorBanner(message: _deleteError!),
-                        const SizedBox(height: AppSpacing.md),
                       ],
-
-                      FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: theme.colorScheme.error,
-                          foregroundColor: theme.colorScheme.onError,
-                        ),
-                        onPressed:
-                            _isDeletingAccount ? null : _handleDeleteAccount,
-                        child: _isDeletingAccount
-                            ? SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: theme.colorScheme.onError,
-                                ),
-                              )
-                            : const Text('Delete Account'),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      'Permanently delete your Pair account, dissolve any active pods, and delete all authentication tokens. This cannot be undone.',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+
+                    if (_deleteError != null) ...[
+                      ErrorBanner(message: _deleteError!),
+                      const SizedBox(height: AppSpacing.md),
                     ],
-                  ),
+
+                    FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: theme.colorScheme.error,
+                        foregroundColor: theme.colorScheme.onError,
+                        minimumSize: const Size(double.infinity, 52),
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: AppRadius.borderRadiusMd,
+                        ),
+                      ),
+                      onPressed:
+                          _isDeletingAccount ? null : _handleDeleteAccount,
+                      child: _isDeletingAccount
+                          ? SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: theme.colorScheme.onError,
+                              ),
+                            )
+                          : Text(
+                              'Delete Account',
+                              style: AppTypography.labelLarge.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onError,
+                              ),
+                            ),
+                    ),
+                  ],
                 ),
               ),
+              const SizedBox(height: AppSpacing.xl),
             ],
           ),
         ),

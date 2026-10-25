@@ -4,8 +4,13 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/router.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_radii.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_theme_extension.dart';
+import '../../core/theme/app_typography.dart';
+import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/error_banner.dart';
+import '../../core/widgets/section_header.dart';
 import '../auth/auth_state.dart';
 import '../pods/pod_state.dart';
 import 'models/todo_model.dart';
@@ -51,6 +56,7 @@ class _TodoListScreenState extends ConsumerState<TodoListScreen> {
     String? partnerName,
   ) {
     final theme = Theme.of(context);
+    final tokens = context.tokens;
 
     String label = 'Both';
     Color bgColor = theme.colorScheme.surfaceContainerHighest;
@@ -64,8 +70,8 @@ class _TodoListScreenState extends ConsumerState<TodoListScreen> {
       icon = Icons.person_rounded;
     } else if (todo.assignedTo != null && todo.assignedTo == partnerId) {
       label = partnerName?.isNotEmpty == true ? partnerName! : 'Partner';
-      bgColor = theme.colorScheme.secondaryContainer;
-      fgColor = theme.colorScheme.onSecondaryContainer;
+      bgColor = tokens.flameBackground;
+      fgColor = tokens.flame;
       icon = Icons.person_outline_rounded;
     }
 
@@ -85,9 +91,63 @@ class _TodoListScreenState extends ConsumerState<TodoListScreen> {
           const SizedBox(width: 4),
           Text(
             label,
-            style: theme.textTheme.labelSmall?.copyWith(
+            style: AppTypography.labelSmall.copyWith(
               color: fgColor,
               fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDueDateChip(BuildContext context, String dueDateString) {
+    final theme = Theme.of(context);
+    final tokens = context.tokens;
+
+    Color bg = theme.colorScheme.surface;
+    Color fg = theme.colorScheme.onSurface;
+    IconData icon = Icons.calendar_today_rounded;
+
+    final parsed = DateTime.tryParse(dueDateString);
+    if (parsed != null) {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final due = DateTime(parsed.year, parsed.month, parsed.day);
+      final diffDays = due.difference(today).inDays;
+
+      if (diffDays < 0) {
+        // Overdue
+        bg = theme.colorScheme.error.withValues(alpha: 0.12);
+        fg = theme.colorScheme.error;
+        icon = Icons.warning_amber_rounded;
+      } else if (diffDays <= 1) {
+        // Due today or tomorrow
+        bg = tokens.warning.withValues(alpha: 0.15);
+        fg = tokens.warning;
+        icon = Icons.access_time_rounded;
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: 3,
+      ),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: AppRadius.borderRadiusSm,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: fg),
+          const SizedBox(width: 4),
+          Text(
+            dueDateString,
+            style: AppTypography.labelSmall.copyWith(
+              color: fg,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -104,110 +164,133 @@ class _TodoListScreenState extends ConsumerState<TodoListScreen> {
     String? partnerName,
   ) {
     final theme = Theme.of(context);
+    final tokens = context.tokens;
 
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-      color: theme.colorScheme.surfaceContainerHighest,
-      shape: RoundedRectangleBorder(
-        borderRadius: AppRadius.borderRadiusMd,
+    return Dismissible(
+      key: ValueKey('todo_${todo.id}'),
+      background: Container(
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+        decoration: BoxDecoration(
+          color: tokens.success.withValues(alpha: 0.2),
+          borderRadius: AppRadius.borderRadiusCard,
+        ),
+        child: Icon(Icons.check_rounded, color: tokens.success),
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.xs,
+      secondaryBackground: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.error.withValues(alpha: 0.15),
+          borderRadius: AppRadius.borderRadiusCard,
         ),
-        leading: Transform.scale(
-          scale: 1.1,
-          child: Checkbox(
-            value: todo.isDone,
-            shape: RoundedRectangleBorder(
-              borderRadius: AppRadius.borderRadiusSm,
-            ),
-            onChanged: (val) async {
-              final apiClient = ref.read(apiClientProvider);
-              final success = await ref
-                  .read(podTodosProvider(resolvedPodId).notifier)
-                  .toggleTodoOptimistic(
-                    apiClient: apiClient,
-                    todoId: todo.id,
-                  );
-              if (!success && context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Failed to update task. Changes reverted.'),
-                  ),
-                );
-              }
-            },
-          ),
-        ),
-        title: Text(
-          todo.title,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-            decoration: todo.isDone ? TextDecoration.lineThrough : null,
-            color: todo.isDone
-                ? theme.colorScheme.onSurfaceVariant
-                : theme.colorScheme.onSurface,
-          ),
-        ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: AppSpacing.xs),
-          child: Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: 4,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              _buildAssigneeBadge(
-                context,
-                todo,
-                currentUserId,
-                partnerId,
-                partnerName,
-              ),
-              if (todo.dueDate != null && todo.dueDate!.isNotEmpty)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.sm,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: AppRadius.borderRadiusSm,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.calendar_today_rounded,
-                        size: 12,
-                        color: theme.colorScheme.primary,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        todo.dueDate!,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.onSurface,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
+        child: Icon(Icons.delete_outline_rounded, color: theme.colorScheme.error),
+      ),
+      confirmDismiss: (direction) async {
+        if (direction == DismissDirection.startToEnd) {
+          final apiClient = ref.read(apiClientProvider);
+          await ref
+              .read(podTodosProvider(resolvedPodId).notifier)
+              .toggleTodoOptimistic(apiClient: apiClient, todoId: todo.id);
+          return false;
+        } else {
+          final apiClient = ref.read(apiClientProvider);
+          final ok = await ref
+              .read(podTodosProvider(resolvedPodId).notifier)
+              .deleteTodo(apiClient: apiClient, todoId: todo.id);
+          if (ok && context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Task deleted'),
+                action: SnackBarAction(
+                  label: 'Dismiss',
+                  onPressed: () {},
                 ),
-            ],
+              ),
+            );
+          }
+          return ok;
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: AppRadius.borderRadiusCard,
+          border: Border.all(
+            color: theme.colorScheme.outlineVariant,
           ),
         ),
-        trailing: const Icon(
-          Icons.chevron_right_rounded,
-          size: 20,
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.xs,
+          ),
+          leading: Transform.scale(
+            scale: 1.15,
+            child: Checkbox(
+              value: todo.isDone,
+              shape: const RoundedRectangleBorder(
+                borderRadius: AppRadius.borderRadiusSm,
+              ),
+              onChanged: (val) async {
+                final apiClient = ref.read(apiClientProvider);
+                final success = await ref
+                    .read(podTodosProvider(resolvedPodId).notifier)
+                    .toggleTodoOptimistic(
+                      apiClient: apiClient,
+                      todoId: todo.id,
+                    );
+                if (!success && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Failed to update task. Changes reverted.'),
+                    ),
+                  );
+                }
+              },
+            ),
+          ),
+          title: Text(
+            todo.title,
+            style: AppTypography.bodyMedium.copyWith(
+              fontWeight: FontWeight.w600,
+              decoration: todo.isDone ? TextDecoration.lineThrough : null,
+              color: todo.isDone
+                  ? theme.colorScheme.onSurfaceVariant
+                  : theme.colorScheme.onSurface,
+            ),
+          ),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: AppSpacing.xs),
+            child: Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                _buildAssigneeBadge(
+                  context,
+                  todo,
+                  currentUserId,
+                  partnerId,
+                  partnerName,
+                ),
+                if (todo.dueDate != null && todo.dueDate!.isNotEmpty)
+                  _buildDueDateChip(context, todo.dueDate!),
+              ],
+            ),
+          ),
+          trailing: const Icon(
+            Icons.chevron_right_rounded,
+            size: 20,
+          ),
+          onTap: () {
+            context.go(
+              AppRoutes.todoDetailPath,
+              extra: {'todo': todo, 'pod_id': resolvedPodId},
+            );
+          },
         ),
-        onTap: () {
-          context.go(
-            AppRoutes.todoDetailPath,
-            extra: {'todo': todo, 'pod_id': resolvedPodId},
-          );
-        },
       ),
     );
   }
@@ -325,50 +408,21 @@ class _TodoListScreenState extends ConsumerState<TodoListScreen> {
               else if (openList.isEmpty && doneList.isEmpty)
                 SliverFillRemaining(
                   hasScrollBody: false,
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppSpacing.xl),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.task_alt_rounded,
-                            size: 64,
-                            color: theme.colorScheme.primary,
-                          ),
-                          const SizedBox(height: AppSpacing.md),
-                          Text(
-                            'No Tasks Found',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: theme.colorScheme.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.xs),
-                          Text(
-                            'Create a task to build accountability with your partner.',
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.lg),
-                          FilledButton.icon(
-                            onPressed: () {
-                              showAddEditTodoModal(
-                                context,
-                                podId: resolvedPodId,
-                                currentUserId: currentUserId,
-                                partnerId: partnerId,
-                                partnerName: partnerName,
-                              );
-                            },
-                            icon: const Icon(Icons.add_rounded),
-                            label: const Text('Add First Task'),
-                          ),
-                        ],
-                      ),
-                    ),
+                  child: EmptyState(
+                    icon: Icons.checklist_rounded,
+                    title: 'No Tasks Found',
+                    message:
+                        'Create a task to build accountability with your partner.',
+                    actionLabel: 'Add First Task',
+                    onAction: () {
+                      showAddEditTodoModal(
+                        context,
+                        podId: resolvedPodId,
+                        currentUserId: currentUserId,
+                        partnerId: partnerId,
+                        partnerName: partnerName,
+                      );
+                    },
                   ),
                 )
               else ...[
@@ -381,16 +435,8 @@ class _TodoListScreenState extends ConsumerState<TodoListScreen> {
                       AppSpacing.lg,
                       AppSpacing.xs,
                     ),
-                    child: Row(
-                      children: [
-                        Text(
-                          'Open (${openList.length})',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: theme.colorScheme.onSurface,
-                          ),
-                        ),
-                      ],
+                    child: SectionHeader(
+                      title: 'Open (${openList.length})',
                     ),
                   ),
                 ),
@@ -403,19 +449,19 @@ class _TodoListScreenState extends ConsumerState<TodoListScreen> {
                         horizontal: AppSpacing.lg,
                         vertical: AppSpacing.sm,
                       ),
-                      child: Card(
-                        elevation: 0,
-                        color: theme.colorScheme.surfaceContainerHighest,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: AppRadius.borderRadiusMd,
+                      child: Container(
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerHighest,
+                          borderRadius: AppRadius.borderRadiusCard,
+                          border: Border.all(
+                            color: theme.colorScheme.outlineVariant,
+                          ),
                         ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(AppSpacing.md),
-                          child: Text(
-                            'All open tasks completed! Tap + to add another.',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
+                        child: Text(
+                          'All open tasks completed! Tap + to add another.',
+                          style: AppTypography.bodyMedium.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ),
@@ -454,12 +500,8 @@ class _TodoListScreenState extends ConsumerState<TodoListScreen> {
                         AppSpacing.lg,
                         AppSpacing.xs,
                       ),
-                      child: Text(
-                        'Completed (${doneList.length})',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
+                      child: SectionHeader(
+                        title: 'Completed (${doneList.length})',
                       ),
                     ),
                   ),

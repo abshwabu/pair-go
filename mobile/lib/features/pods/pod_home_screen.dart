@@ -4,7 +4,13 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/router.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_radii.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_theme_extension.dart';
+import '../../core/theme/app_typography.dart';
+import '../../core/widgets/app_avatar.dart';
+import '../../core/widgets/app_card.dart';
+import '../../core/widgets/app_shimmer.dart';
 import '../../core/widgets/error_banner.dart';
 import '../auth/auth_state.dart';
 import '../todos/todos_provider.dart';
@@ -51,19 +57,23 @@ class _PodHomeScreenState extends ConsumerState<PodHomeScreen> {
       builder: (dialogCtx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
           title: const Text('Reject Suggestion?'),
+          shape: const RoundedRectangleBorder(
+            borderRadius: AppRadius.borderRadiusCard,
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'Are you sure you want to decline this accountability partner suggestion with ${partner?.user.name.isNotEmpty == true ? partner!.user.name : "this partner"}?',
+                style: AppTypography.bodyMedium,
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
                 'This pod will be dissolved and you can search for a different partner.',
-                style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(ctx).colorScheme.onSurfaceVariant,
-                    ),
+                style: AppTypography.bodySmall.copyWith(
+                  color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                ),
               ),
               if (partner != null && partner.user.id.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.md),
@@ -176,15 +186,32 @@ class _PodHomeScreenState extends ConsumerState<PodHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final tokens = context.tokens;
     final podState = ref.watch(activePodDetailProvider);
     final currentUser = ref.watch(currentUserProvider);
 
     if (podState.isLoading) {
       return Scaffold(
         backgroundColor: theme.scaffoldBackgroundColor,
-        body: Center(
-          child: CircularProgressIndicator(
-            color: theme.colorScheme.primary,
+        appBar: AppBar(
+          title: const Text('Pod Home'),
+          elevation: 0,
+        ),
+        body: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppShimmer.card(height: 180),
+              const SizedBox(height: AppSpacing.lg),
+              AppShimmer.card(height: 80),
+              const SizedBox(height: AppSpacing.lg),
+              AppShimmer.box(width: 140, height: 24),
+              const SizedBox(height: AppSpacing.sm),
+              AppShimmer.card(height: 64),
+              const SizedBox(height: AppSpacing.sm),
+              AppShimmer.card(height: 64),
+            ],
           ),
         ),
       );
@@ -286,101 +313,112 @@ class _PodHomeScreenState extends ConsumerState<PodHomeScreen> {
                 partnerName: partner?.user.name,
               ),
 
-              // 1. Partner Info & Streak Badge Header Card
-              Card(
-                elevation: 0,
-                color: theme.colorScheme.surfaceContainerHighest,
-                shape: RoundedRectangleBorder(
-                  borderRadius: AppRadius.borderRadiusLg,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 30,
-                            backgroundColor:
-                                theme.colorScheme.primaryContainer,
-                            backgroundImage: partner?.user.avatarUrl != null &&
-                                    partner!.user.avatarUrl!.isNotEmpty
-                                ? NetworkImage(partner.user.avatarUrl!)
-                                : null,
-                            child: partner?.user.avatarUrl == null ||
-                                    partner!.user.avatarUrl!.isEmpty
-                                ? Text(
-                                    partner?.user.name.isNotEmpty == true
-                                        ? partner!.user.name[0].toUpperCase()
-                                        : 'P',
-                                    style: theme.textTheme.titleLarge?.copyWith(
-                                      color:
-                                          theme.colorScheme.onPrimaryContainer,
-                                      fontWeight: FontWeight.bold,
+              // 1. Partner Info & Streak Badge Header Card with overlapped avatars
+              AppCard(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        // Overlapped Avatars Stack
+                        SizedBox(
+                          width: 60,
+                          height: 48,
+                          child: Stack(
+                            children: [
+                              Positioned(
+                                left: 0,
+                                top: 2,
+                                child: AppAvatar(
+                                  imageUrl: currentUser?.avatarUrl,
+                                  name: currentUser?.name ?? 'You',
+                                  size: AppAvatarSize.md,
+                                ),
+                              ),
+                              Positioned(
+                                left: 18,
+                                top: 0,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: theme.colorScheme.surface,
+                                      width: 2.5,
                                     ),
-                                  )
-                                : null,
+                                  ),
+                                  child: AppAvatar(
+                                    imageUrl: partner?.user.avatarUrl,
+                                    name: partner?.user.name ?? 'Partner',
+                                    size: AppAvatarSize.md,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: AppSpacing.md),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  partner?.user.name ?? 'Partner',
-                                  style:
-                                      theme.textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: theme.colorScheme.onSurface,
-                                  ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                partner?.user.name ?? 'Partner',
+                                style: AppTypography.titleMedium.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.colorScheme.onSurface,
                                 ),
-                                const SizedBox(height: AppSpacing.xs),
-                                Text(
-                                  'Accountability Partner',
-                                  style:
-                                      theme.textTheme.bodySmall?.copyWith(
-                                    color:
-                                        theme.colorScheme.onSurfaceVariant,
-                                  ),
+                              ),
+                              const SizedBox(height: AppSpacing.xxs),
+                              Text(
+                                'Accountability Partner',
+                                style: AppTypography.bodySmall.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
                                 ),
-                              ],
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Streak Badge (embedded widget, tapping routes to streak-detail)
+                        StreakBadge(
+                          podId: resolvedPodId,
+                          fallbackCurrentStreak: pod?.streak.currentStreak,
+                          fallbackBestStreak: pod?.streak.bestStreak,
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: AppSpacing.md),
+                    const Divider(),
+                    const SizedBox(height: AppSpacing.sm),
+
+                    // Goals comparison
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.all(AppSpacing.sm),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surfaceContainerHighest,
+                              borderRadius: AppRadius.borderRadiusMd,
                             ),
-                          ),
-
-                          // Streak Badge (embedded widget, tapping routes to streak-detail)
-                          StreakBadge(
-                            podId: resolvedPodId,
-                            fallbackCurrentStreak: pod?.streak.currentStreak,
-                            fallbackBestStreak: pod?.streak.bestStreak,
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: AppSpacing.md),
-                      const Divider(),
-                      const SizedBox(height: AppSpacing.sm),
-
-                      // Goals comparison
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   'THEIR GOAL',
-                                  style: theme.textTheme.labelSmall?.copyWith(
+                                  style: AppTypography.labelSmall.copyWith(
                                     color: theme.colorScheme.primary,
                                     fontWeight: FontWeight.bold,
                                     letterSpacing: 1.1,
                                   ),
                                 ),
-                                const SizedBox(height: AppSpacing.xs),
+                                const SizedBox(height: AppSpacing.xxs),
                                 Text(
                                   partner?.goal.title ?? 'No goal details',
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    fontWeight: FontWeight.w500,
+                                  style: AppTypography.bodyMedium.copyWith(
+                                    fontWeight: FontWeight.w600,
                                     color: theme.colorScheme.onSurface,
                                   ),
                                   maxLines: 2,
@@ -389,24 +427,31 @@ class _PodHomeScreenState extends ConsumerState<PodHomeScreen> {
                               ],
                             ),
                           ),
-                          const SizedBox(width: AppSpacing.md),
-                          Expanded(
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.all(AppSpacing.sm),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surfaceContainerHighest,
+                              borderRadius: AppRadius.borderRadiusMd,
+                            ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   'YOUR GOAL',
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: theme.colorScheme.secondary,
+                                  style: AppTypography.labelSmall.copyWith(
+                                    color: tokens.flame,
                                     fontWeight: FontWeight.bold,
                                     letterSpacing: 1.1,
                                   ),
                                 ),
-                                const SizedBox(height: AppSpacing.xs),
+                                const SizedBox(height: AppSpacing.xxs),
                                 Text(
                                   myMembership?.goal.title ?? 'Your goal',
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    fontWeight: FontWeight.w500,
+                                  style: AppTypography.bodyMedium.copyWith(
+                                    fontWeight: FontWeight.w600,
                                     color: theme.colorScheme.onSurface,
                                   ),
                                   maxLines: 2,
@@ -415,100 +460,102 @@ class _PodHomeScreenState extends ConsumerState<PodHomeScreen> {
                               ],
                             ),
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      const Divider(height: 1),
-                      const SizedBox(height: AppSpacing.xs),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          TextButton.icon(
-                            onPressed: _isRejecting
-                                ? null
-                                : () => _handleRejectSuggestion(
-                                      resolvedPodId,
-                                      partner,
-                                    ),
-                            icon: Icon(
-                              Icons.person_remove_outlined,
-                              size: 16,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    const Divider(height: 1),
+                    const SizedBox(height: AppSpacing.xs),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton.icon(
+                          onPressed: _isRejecting
+                              ? null
+                              : () => _handleRejectSuggestion(
+                                    resolvedPodId,
+                                    partner,
+                                  ),
+                          icon: Icon(
+                            Icons.person_remove_outlined,
+                            size: 16,
+                            color: theme.colorScheme.error,
+                          ),
+                          label: Text(
+                            'Reject Suggestion / Change Partner',
+                            style: AppTypography.labelMedium.copyWith(
                               color: theme.colorScheme.error,
+                              fontWeight: FontWeight.w600,
                             ),
-                            label: Text(
-                              'Reject Suggestion / Change Partner',
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                color: theme.colorScheme.error,
-                                fontWeight: FontWeight.w600,
-                              ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: AppSpacing.lg),
+
+              // 2. Daily Check-in Quick Action Card
+              AppCard(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: tokens.flameBackground,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: tokens.flame.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.fact_check_rounded,
+                        color: tokens.flame,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Daily Check-in',
+                            style: AppTypography.titleMedium.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.xxs),
+                          Text(
+                            'Keep your streak alive by checking in today.',
+                            style: AppTypography.bodySmall.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: AppSpacing.xl),
-
-              // 2. Daily Check-in Card (Placeholder / Quick action)
-              Card(
-                elevation: 0,
-                color: theme.colorScheme.surfaceContainerHighest,
-                shape: RoundedRectangleBorder(
-                  borderRadius: AppRadius.borderRadiusLg,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(AppSpacing.md),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.secondaryContainer,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.fact_check_rounded,
-                          color: theme.colorScheme.onSecondaryContainer,
-                          size: 26,
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    FilledButton.tonal(
+                      style: FilledButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: AppRadius.borderRadiusMd,
                         ),
                       ),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Daily Check-in',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: theme.colorScheme.onSurface,
-                              ),
-                            ),
-                            const SizedBox(height: AppSpacing.xs),
-                            Text(
-                              'Keep your streak alive by checking in today.',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      FilledButton.tonal(
-                        onPressed: () {
-                          context.go(
-                            AppRoutes.checkinPath,
-                            extra: resolvedPodId,
-                          );
-                        },
-                        child: const Text('Check In'),
-                      ),
-                    ],
-                  ),
+                      onPressed: () {
+                        context.go(
+                          AppRoutes.checkinPath,
+                          extra: resolvedPodId,
+                        );
+                      },
+                      child: const Text('Check In'),
+                    ),
+                  ],
                 ),
               ),
 
@@ -520,7 +567,7 @@ class _PodHomeScreenState extends ConsumerState<PodHomeScreen> {
                 children: [
                   Text(
                     'Open Todos',
-                    style: theme.textTheme.titleMedium?.copyWith(
+                    style: AppTypography.titleMedium.copyWith(
                       fontWeight: FontWeight.bold,
                       color: theme.colorScheme.onSurface,
                     ),
@@ -540,71 +587,71 @@ class _PodHomeScreenState extends ConsumerState<PodHomeScreen> {
               const SizedBox(height: AppSpacing.xs),
 
               if (isLoadingTodos && todosState.todos.isEmpty)
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.lg),
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: theme.colorScheme.primary,
-                    ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                  child: Column(
+                    children: [
+                      AppShimmer.card(height: 60),
+                      const SizedBox(height: AppSpacing.xs),
+                      AppShimmer.card(height: 60),
+                    ],
                   ),
                 )
               else if (todosPreview.isEmpty)
-                Card(
-                  elevation: 0,
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: AppRadius.borderRadiusMd,
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.lg),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.checklist_rounded,
-                          color: theme.colorScheme.onSurfaceVariant,
-                          size: 28,
-                        ),
-                        const SizedBox(width: AppSpacing.md),
-                        Expanded(
-                          child: Text(
-                            'No open tasks yet. Create one to stay accountable!',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
+                AppCard(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.checklist_rounded,
+                        color: theme.colorScheme.onSurfaceVariant,
+                        size: 28,
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: Text(
+                          'No open tasks yet. Create one to stay accountable!',
+                          style: AppTypography.bodyMedium.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
-                        TextButton(
-                          onPressed: () {
-                            showAddEditTodoModal(
-                              context,
-                              podId: resolvedPodId,
-                              currentUserId: currentUser?.id ?? '',
-                              partnerId: partner?.user.id,
-                              partnerName: partner?.user.name,
-                            );
-                          },
-                          child: const Text('Add'),
-                        ),
-                      ],
-                    ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          showAddEditTodoModal(
+                            context,
+                            podId: resolvedPodId,
+                            currentUserId: currentUser?.id ?? '',
+                            partnerId: partner?.user.id,
+                            partnerName: partner?.user.name,
+                          );
+                        },
+                        child: const Text('Add'),
+                      ),
+                    ],
                   ),
                 )
               else
                 ...todosPreview.map((todo) {
-                  return Card(
-                    elevation: 0,
+                  return Container(
                     margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: AppRadius.borderRadiusMd,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHighest,
+                      borderRadius: AppRadius.borderRadiusCard,
+                      border: Border.all(
+                        color: theme.colorScheme.outlineVariant,
+                      ),
                     ),
                     child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                        vertical: AppSpacing.xs,
+                      ),
                       leading: Transform.scale(
-                        scale: 1.1,
+                        scale: 1.15,
                         child: Checkbox(
                           value: todo.isDone,
-                          shape: RoundedRectangleBorder(
+                          shape: const RoundedRectangleBorder(
                             borderRadius: AppRadius.borderRadiusSm,
                           ),
                           onChanged: (val) async {
@@ -627,7 +674,7 @@ class _PodHomeScreenState extends ConsumerState<PodHomeScreen> {
                       ),
                       title: Text(
                         todo.title,
-                        style: theme.textTheme.bodyMedium?.copyWith(
+                        style: AppTypography.bodyMedium.copyWith(
                           fontWeight: FontWeight.w600,
                           decoration:
                               todo.isDone ? TextDecoration.lineThrough : null,
@@ -639,7 +686,7 @@ class _PodHomeScreenState extends ConsumerState<PodHomeScreen> {
                       subtitle: todo.dueDate != null && todo.dueDate!.isNotEmpty
                           ? Text(
                               'Due: ${todo.dueDate}',
-                              style: theme.textTheme.bodySmall?.copyWith(
+                              style: AppTypography.bodySmall.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant,
                               ),
                             )
